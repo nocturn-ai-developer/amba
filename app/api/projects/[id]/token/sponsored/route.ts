@@ -28,7 +28,7 @@ const schema = z.object({
 });
 
 /**
- * Free launch for Aestrodom Pass holders: the platform's sponsor wallet pays the launch fee and gas,
+ * Free launch for Stardoom Pass holders: the platform's sponsor wallet pays the launch fee and gas,
  * and the signed-in wallet that holds the pass becomes the creator fee recipient.
  */
 export const POST = route<{ id: string }>(async (req, { params }) => {

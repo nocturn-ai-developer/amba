@@ -7,7 +7,7 @@
 :80 {
 	encode zstd gzip
 
-	# Previews: arrow.preview.aestrodom.org -> container alias preview-arrow
+	# Previews: arrow.preview.stardoom.org -> container alias preview-arrow
 	@preview host *.{$PRISMATIC_PREVIEW_DOMAIN}
 	handle @preview {
 		header X-Robots-Tag "noindex, nofollow"
@@ -24,7 +24,7 @@
 		}
 	}
 
-	# Deployed projects: arrow.aestrodom.org -> container alias site-arrow
+	# Deployed projects: arrow.stardoom.org -> container alias site-arrow
 	@site host *.{$PRISMATIC_DOMAIN}
 	handle @site {
 		reverse_proxy site-{labels.{$SITE_SLUG_LABEL}}:3000 {

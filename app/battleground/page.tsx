@@ -13,7 +13,7 @@ import { VoteButton } from "@/components/battleground/vote-button";
 
 export const metadata = {
   title: "Battleground",
-  description: "Apps with a token battle for votes on Aestrodom. Top-voted apps win rewards.",
+  description: "Apps with a token battle for votes on Stardoom AI. Top-voted apps win rewards.",
 };
 export const dynamic = "force-dynamic";
 
@@ -132,7 +132,7 @@ export default async function BattlegroundPage({ searchParams }: { searchParams:
 
           <p className="prose-serif mt-6 max-w-2xl !text-[14px]">
             Only apps with a launched token can be voted on.
-            {env.voteMinHoldUsd > 0 && ` To vote, hold at least $${env.voteMinHoldUsd} of $AESTRODOM in the wallet you sign in with.`} One vote
+            {env.voteMinHoldUsd > 0 && ` To vote, hold at least $${env.voteMinHoldUsd} of $STARDOOM in the wallet you sign in with.`} One vote
             per account per app, and you can&apos;t vote for your own.
             Rewards go to the creator wallet of the app&apos;s token. Listing is on by default for deployed projects; owners can hide
             a project in its settings. Token figures come from the chain.

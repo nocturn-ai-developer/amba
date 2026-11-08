@@ -7,7 +7,7 @@ import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
 /**
- * "Continue with Privy" → Privy modal → exchange Privy's access token for a Aestrodom session.
+ * "Continue with Privy" → Privy modal → exchange Privy's access token for a Stardoom AI session.
  * The server verifies the token against Privy's public keys before creating the session.
  */
 export function PrivyLogin() {

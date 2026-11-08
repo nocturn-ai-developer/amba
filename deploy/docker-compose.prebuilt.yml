@@ -1,0 +1,7 @@
+# Use an app image built from a prebuilt Next.js output instead of building from source on the host.
+#   docker build -t stardoom-app:latest -f Dockerfile.prebuilt prebuilt/
+#   docker compose -f docker-compose.yml -f docker-compose.prebuilt.yml up -d
+services:
+  app:
+    build: !reset null
+    image: stardoom-app:latest

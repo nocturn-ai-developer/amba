@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows", "darwin", "darwin-arm64", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -55,6 +56,13 @@ enum LaunchStatus {
   FAILED
 }
 
+enum AiProvider {
+  ANTHROPIC
+  OLLAMA
+  LMSTUDIO
+  OPENAI_COMPAT
+}
+
 enum LogSource {
   AI
   BUILD
@@ -83,7 +91,7 @@ model User {
   role          Role     @default(USER)
   plan          Plan     @default(FREE)
   disabled      Boolean  @default(false)
-  // Prepaid AI credits (bought with $AESTRODOM). May dip below zero by the cost of the last run.
+  // Prepaid AI credits (bought with $STARDOOM). May dip below zero by the cost of the last run.
   credits       Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -96,9 +104,30 @@ model User {
   creditLedger      CreditLedger[]
   votes             ProjectVote[]
   sponsoredLaunches SponsoredLaunch[]
+  aiSettings        AiSettings?
 }
 
-/// Personal API key (aestro_sk_...). Only the SHA-256 hash is stored; the key is shown once.
+/// The user's own AI provider. Secrets are AES-256-GCM encrypted (lib/crypto/secret-box.ts) and never sent to the browser.
+model AiSettings {
+  id                String     @id @default(cuid())
+  userId            String     @unique
+  provider          AiProvider @default(ANTHROPIC)
+  anthropicKeyEnc   String?
+  anthropicKeyLast4 String?
+  // OpenAI-compatible endpoints (desktop only): base URL ending in /v1, model id, optional key.
+  baseUrl           String?
+  model             String?
+  apiKeyEnc         String?
+  // Desktop only: the stardoom.org account used to publish projects (a stardoom_sk_ key).
+  publishUrl        String?
+  publishKeyEnc     String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Personal API key (stardoom_sk_...). Only the SHA-256 hash is stored; the key is shown once.
 model ApiKey {
   id         String    @id @default(cuid())
   userId     String
@@ -114,14 +143,14 @@ model ApiKey {
   @@index([userId])
 }
 
-/// A credit top-up in USD, paid with an ERC-20 transfer of $AESTRODOM to the treasury at the price quoted
+/// A credit top-up in USD, paid with an ERC-20 transfer of $STARDOOM to the treasury at the price quoted
 /// when the order was created. `amount` (wei, decimal string) carries random dust so a payment maps to one order.
 model CreditOrder {
   id        String            @id @default(cuid())
   userId    String
   credits   Int
   usdCents  Int               @default(0)
-  // USD per whole $AESTRODOM at quote time (decimal string).
+  // USD per whole $STARDOOM at quote time (decimal string).
   tokenUsd  String?
   amount    String
   status    CreditOrderStatus @default(PENDING)
@@ -170,6 +199,9 @@ model Project {
   // Optional skills (lib/skills.ts) whose guidance is added to every agent run.
   skills        String[]      @default([])
   sizeBytes     Int           @default(0)
+  // Desktop only: the project this one was published to on the web.
+  remoteId      String?
+  remoteUrl     String?
   lastBuildOk   Boolean?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -337,7 +369,7 @@ model ProjectLog {
   @@index([projectId, createdAt])
 }
 
-/// A token launch paid for by the platform's sponsor wallet, unlocked by holding an Aestrodom Pass.
+/// A token launch paid for by the platform's sponsor wallet, unlocked by holding an Stardoom Pass.
 /// One row per pass per UTC day: the unique key is the daily quota and also blocks double spends.
 model SponsoredLaunch {
   id              String   @id @default(cuid())
@@ -354,4 +386,12 @@ model SponsoredLaunch {
   @@unique([passTokenId, day])
   @@index([day])
   @@index([userId])
+}
+
+/// Site-wide values an admin edits from /admin (e.g. the $STARDOOM contract address), one row per key.
+model SiteSetting {
+  key         String   @id
+  value       String
+  updatedById String?
+  updatedAt   DateTime @updatedAt
 }

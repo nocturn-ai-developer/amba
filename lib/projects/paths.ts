@@ -50,7 +50,7 @@ export function normalizeProjectPath(input: string): string {
 
 export function assertWritablePath(input: string): string {
   const p = normalizeProjectPath(input);
-  if (PROTECTED_FILES.has(p)) throw new PathError(`${p} is managed by Aestrodom and cannot be modified`);
+  if (PROTECTED_FILES.has(p)) throw new PathError(`${p} is managed by Stardoom AI and cannot be modified`);
   const dot = p.lastIndexOf(".");
   const ext = dot >= 0 ? p.slice(dot).toLowerCase() : "";
   if (!ALLOWED_EXTENSIONS.has(ext)) throw new PathError(`File type not allowed: ${ext || "(none)"}`);

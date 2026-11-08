@@ -19,7 +19,7 @@ export function AuthProviders({ children }: { children: React.ReactNode }) {
           theme: theme === "light" ? "light" : "dark",
           accentColor: theme === "light" ? "#000000" : "#ffffff",
           logo: "/icon.png",
-          landingHeader: "Sign in to Aestrodom",
+          landingHeader: "Sign in to Stardoom AI",
           showWalletLoginFirst: false,
         },
       }}

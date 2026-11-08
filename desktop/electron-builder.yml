@@ -1,0 +1,40 @@
+appId: org.stardoom.desktop
+productName: Stardoom AI
+copyright: Copyright © Stardoom AI
+directories:
+  output: dist
+  buildResources: build
+# No asar: embedded PostgreSQL binaries must be real files that can be spawned.
+asar: false
+files:
+  - main.cjs
+  - package.json
+  - "!app/**"
+  - "!dist/**"
+  - "!build.mjs"
+  - "!after-pack.cjs"
+# server/, runtime/ and migrations/ are copied into resources by after-pack.cjs (extraResources drops node_modules).
+afterPack: ./after-pack.cjs
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+  artifactName: Stardoom-AI-Setup-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: Stardoom AI
+mac:
+  # Built per architecture on matching runners (native PostgreSQL / toolchain binaries).
+  target:
+    - target: dmg
+  category: public.app-category.developer-tools
+  icon: build/icon.png
+  artifactName: Stardoom-AI-${version}-${arch}.${ext}
+  hardenedRuntime: false
+  identity: null
+dmg:
+  title: Stardoom AI ${version}

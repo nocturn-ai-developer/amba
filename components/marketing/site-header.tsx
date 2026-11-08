@@ -35,7 +35,7 @@ export function SiteHeader({ signedIn }: { signedIn: boolean }) {
             href={X_URL}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Aestrodom on X"
+            aria-label="Stardoom AI on X"
             title={`@${X_HANDLE} on X`}
             className="hidden size-9 place-items-center rounded-sm text-muted transition-colors hover:bg-elevated hover:text-fg sm:grid"
           >

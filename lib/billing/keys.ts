@@ -2,8 +2,10 @@ import "server-only";
 import { createHash, randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
 
-/** Personal API keys: `aestro_sk_` + 40 base62 characters. Only the SHA-256 hash is stored. */
-export const KEY_PREFIX = "aestro_sk_";
+/** Personal API keys: `stardoom_sk_` + 40 base62 characters. Only the SHA-256 hash is stored. */
+export const KEY_PREFIX = "stardoom_sk_";
+/** Prefix of keys issued before the rename to Stardoom. Still accepted, never issued. */
+export const LEGACY_KEY_PREFIX = "aestro_sk_";
 export const MAX_ACTIVE_KEYS = 10;
 
 const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -25,7 +27,7 @@ export function generateKey() {
 }
 
 export function looksLikeKey(value: string) {
-  return value.startsWith(KEY_PREFIX) && /^aestro_sk_[0-9A-Za-z]{40}$/.test(value);
+  return /^(?:stardoom_sk_|aestro_sk_)[0-9A-Za-z]{40}$/.test(value);
 }
 
 /** Resolves an API key to its active owner, or null. Touches `lastUsedAt` at most once a minute. */

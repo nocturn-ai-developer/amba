@@ -2,17 +2,22 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /** Product name, in one place. */
-export const BRAND = "aestrodom";
-export const BRAND_TITLE = "Aestrodom";
+export const BRAND = "stardoom ai";
+export const BRAND_TITLE = "Stardoom AI";
 
-/** Aestrodom mark: the 3D triangle seen from above, drawn in ink (faces shaded by opacity) so it follows the theme. */
+/** Stardoom AI mark: a faceted 3D star, drawn in ink (facets shaded by opacity) so it follows the theme. */
 export function BrandMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 64 64" aria-hidden className={cn("inline-block size-[22px] shrink-0 text-fg", className)}>
-      <g strokeLinejoin="round" strokeWidth="2.5" fill="currentColor" stroke="currentColor">
-        <path d="M32 5 L33 39 L4 57 Z" opacity="0.35" />
-        <path d="M32 5 L60 57 L33 39 Z" />
-        <path d="M4 57 L33 39 L60 57 Z" opacity="0.65" />
+      <g strokeLinejoin="round" strokeWidth="1.2" fill="currentColor" stroke="currentColor">
+        <path d="M32.0 32.0 L32.0 2.0 L25.6 25.6 Z" opacity="0.62" />
+        <path d="M32.0 32.0 L32.0 2.0 L38.4 25.6 Z" opacity="0.73" />
+        <path d="M32.0 32.0 L62.0 32.0 L38.4 25.6 Z" opacity="1.0" />
+        <path d="M32.0 32.0 L62.0 32.0 L38.4 38.4 Z" opacity="1.0" />
+        <path d="M32.0 32.0 L32.0 62.0 L38.4 38.4 Z" opacity="0.73" />
+        <path d="M32.0 32.0 L32.0 62.0 L25.6 38.4 Z" opacity="0.62" />
+        <path d="M32.0 32.0 L2.0 32.0 L25.6 38.4 Z" opacity="0.35" />
+        <path d="M32.0 32.0 L2.0 32.0 L25.6 25.6 Z" opacity="0.35" />
       </g>
     </svg>
   );
@@ -31,11 +36,11 @@ export function Logo({ href = "/", className }: { href?: string; className?: str
   );
 }
 
-/** $AESTRODOM token symbol. */
-export const TOKEN_SYMBOL = "AESTRODOM";
+/** $STARDOOM token symbol. */
+export const TOKEN_SYMBOL = "STARDOOM";
 
 /** Official X (Twitter) account. */
-export const X_HANDLE = "aestrodom_ai";
+export const X_HANDLE = "stardoom_ai";
 export const X_URL = `https://x.com/${X_HANDLE}`;
 
 /** The X logo (lucide ships no brand marks). */

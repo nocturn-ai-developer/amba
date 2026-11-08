@@ -160,7 +160,7 @@ export function EmptyProjects({ message = "No apps here yet." }: { message?: str
         <Plus className="size-5" />
       </span>
       <div className="mt-4 text-[16px] font-semibold">{message}</div>
-      <p className="mt-1 text-[14px] text-muted">Describe an idea and Claude will build the first version.</p>
+      <p className="mt-1 text-[14px] text-muted">Describe an idea and the AI will build the first version.</p>
       <Link href="/dashboard/new" className="btn-primary mt-6 rounded-xl px-4 py-2 text-[14px] font-bold">
         Start a new app
       </Link>

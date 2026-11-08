@@ -8,15 +8,15 @@ import { robinhood } from "@/lib/chains/robinhood";
 
 function makeConfig() {
   const wcProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://aestrodom.org";
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://stardoom.org";
   return createConfig({
     chains: [robinhood],
     ssr: true,
     connectors: [
       injected({ shimDisconnect: true }),
-      coinbaseWallet({ appName: "Aestrodom" }),
+      coinbaseWallet({ appName: "Stardoom AI" }),
       ...(wcProjectId
-        ? [walletConnect({ projectId: wcProjectId, metadata: { name: "Aestrodom", description: "Build anything with AI", url: origin, icons: [`${origin}/icon.png`] } })]
+        ? [walletConnect({ projectId: wcProjectId, metadata: { name: "Stardoom AI", description: "Build anything with AI", url: origin, icons: [`${origin}/icon.png`] } })]
         : []),
     ],
     transports: { [robinhood.id]: http(robinhood.rpcUrls.default.http[0]) },

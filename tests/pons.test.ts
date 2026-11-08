@@ -174,7 +174,7 @@ describe("phases", () => {
   });
 });
 
-describe("Aestrodom creator tax policy (1–4%)", () => {
+describe("Stardoom creator tax policy (1–4%)", () => {
   const opts = (salt: `0x${string}`) => ({ maxCreatorTaxBps: 400, minCreatorTaxBps: 100, expectedEconomics: ECON, salt });
   it("accepts 1% to 4%", () => {
     expect(buildTokenParams({ ...baseInput, creatorTaxBps: 100, buybackEnabled: false }, opts(randomSalt())).creatorTaxBps).toBe(100);

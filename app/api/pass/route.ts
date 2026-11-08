@@ -8,7 +8,7 @@ import { log, errorMessage } from "@/lib/logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Public Aestrodom Pass state: supply, mint status and, for `?wallet=`, today's free launch quota. */
+/** Public Stardoom Pass state: supply, mint status and, for `?wallet=`, today's free launch quota. */
 export const GET = route(async (req) => {
   const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
   await enforceRateLimit(`pass:status:${ip}`, LIMITS.passStatus);
@@ -17,6 +17,6 @@ export const GET = route(async (req) => {
     return NextResponse.json(await passStatus(wallet));
   } catch (err) {
     log.warn("pass.status.error", { error: errorMessage(err) });
-    return NextResponse.json({ error: "Could not read the Aestrodom Pass from Robinhood Chain. Try again shortly." }, { status: 502 });
+    return NextResponse.json({ error: "Could not read the Stardoom Pass from Robinhood Chain. Try again shortly." }, { status: 502 });
   }
 });

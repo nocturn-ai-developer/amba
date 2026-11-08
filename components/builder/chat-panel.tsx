@@ -14,7 +14,7 @@ export function ChatPanel({ messages }: { messages: ChatMessage[] }) {
   if (messages.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-        <p className="text-sm text-muted">Ask Claude to change anything.</p>
+        <p className="text-sm text-muted">Ask the AI to change anything.</p>
         <p className="mt-1 text-xs text-subtle">“Make the hero more cinematic” · “Add a roadmap section”</p>
       </div>
     );

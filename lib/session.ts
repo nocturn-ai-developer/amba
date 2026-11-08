@@ -2,14 +2,17 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { env } from "@/lib/env";
+import { localUser } from "@/lib/desktop";
 
 /** The current, non-disabled user from the database (a valid cookie alone is not enough), or null. */
 export async function currentUser() {
+  if (env.appMode === "desktop") return localUser();
   const session = await auth();
   if (!session?.user?.id) return null;
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, email: true, walletAddress: true, role: true, plan: true, credits: true, disabled: true, createdAt: true },
+    select: { id: true, name: true, email: true, walletAddress: true, role: true, plan: true, disabled: true, createdAt: true },
   });
   return user && !user.disabled ? user : null;
 }

@@ -1,4 +1,4 @@
-# Aestrodom security model
+# Stardoom security model
 
 ## Trust boundaries
 
@@ -49,7 +49,7 @@
 - `/tmp` as `noexec,nosuid,nodev` tmpfs
 - **no bind mounts and no volumes** — source is copied in with the archive API; the host filesystem
   and the Docker socket are never visible to project code
-- **empty environment** — no Aestrodom secret (`ANTHROPIC_API_KEY`, `DATABASE_URL`, `AUTH_SECRET`,
+- **empty environment** — no Stardoom secret (`ANTHROPIC_API_KEY`, `DATABASE_URL`, `AUTH_SECRET`,
   RPC credentials …) can reach generated code
 - production: attached only to the `internal: true` project network (no internet egress), reachable
   only by Caddy
@@ -64,7 +64,7 @@ plugins or install packages. Output is staged and swapped in only on success.
 Previews are served from a different site than the app (`*.preview.prismatic.com` in production,
 `127.0.0.1:{port}` vs `localhost` locally) and embedded in an iframe with
 `sandbox="allow-scripts allow-forms allow-popups allow-modals"` — **without** `allow-same-origin`, so
-preview code runs in an opaque origin with no access to Aestrodom cookies or storage.
+preview code runs in an opaque origin with no access to Stardoom cookies or storage.
 
 ## Secrets
 
@@ -78,7 +78,7 @@ preview code runs in an opaque origin with no access to Aestrodom cookies or sto
 
 ## Wallet & token launch (non-custodial)
 
-- Aestrodom never asks for, receives, stores or uses private keys, seed phrases or wallet passwords.
+- Stardoom never asks for, receives, stores or uses private keys, seed phrases or wallet passwords.
 - `POST /token/prepare` returns public configuration only (addresses, chain id, on-chain fee/config,
   prefilled metadata). It never signs anything.
 - The browser re-reads `canLaunch`, `launchFee`, `maxCreatorTaxBps`, the config and
@@ -86,7 +86,7 @@ preview code runs in an opaque origin with no access to Aestrodom cookies or sto
   `TokenParams.expectedEconomics`, uses a fresh CSPRNG salt, checks balance ≥ fee (+ buy) + gas, and
   **simulates** the exact call before the wallet prompt. `LaunchEconomicsMismatch` sends the user
   back to review the refreshed terms.
-- Creator fees go to the address the user chose (default: their connected wallet). Aestrodom never
+- Creator fees go to the address the user chose (default: their connected wallet). Stardoom never
   inserts itself as a recipient or modifies parameters.
 - `POST /token/confirm` accepts only a transaction hash. The server fetches the receipt itself,
   requires success, requires `to` ∈ {factory, LaunchAndBuy router}, parses `TokenLaunched` emitted by

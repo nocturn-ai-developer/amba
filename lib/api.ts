@@ -9,6 +9,8 @@ import { log, errorMessage } from "@/lib/logger";
 import { rateLimit, type RateLimitOptions } from "@/lib/rate-limit";
 import { PathError } from "@/lib/projects/paths";
 import { userForApiKey } from "@/lib/billing/keys";
+import { env } from "@/lib/env";
+import { localUser } from "@/lib/desktop";
 
 /** An error whose message is safe to show to the user. */
 export class ApiError extends Error {
@@ -34,10 +36,14 @@ function bearerToken(value: string | null) {
 
 /**
  * Resolves the current user and re-validates against the database on every call. A request carrying
- * `Authorization: Bearer aestro_sk_…` is authenticated by that key only (never falls back to the cookie).
+ * `Authorization: Bearer stardoom_sk_…` is authenticated by that key only (never falls back to the cookie).
  */
 export async function requireUser(): Promise<SessionUser> {
   const token = bearerToken((await headers()).get("authorization"));
+  if (env.appMode === "desktop") {
+    if (token) throw new ApiError(403, "API keys are not used by the desktop app.", "session_required");
+    return requireSessionUser();
+  }
   if (token) {
     const found = await userForApiKey(token);
     if (!found) throw new ApiError(401, "Invalid or revoked API key.", "invalid_api_key");
@@ -50,6 +56,11 @@ export async function requireUser(): Promise<SessionUser> {
 /** Like requireUser, but only the browser session counts (for managing keys and other account settings). */
 export async function requireSessionUser(): Promise<SessionUser> {
   if (bearerToken((await headers()).get("authorization"))) throw new ApiError(403, "This endpoint can't be used with an API key.", "session_required");
+  if (env.appMode === "desktop") {
+    // The only user of a desktop install; the per-launch token was checked in middleware.
+    const u = await localUser();
+    return { id: u.id, email: u.email, name: u.name, role: u.role, plan: u.plan };
+  }
   const session = await auth();
   const id = session?.user?.id;
   if (!id) throw new ApiError(401, "Please sign in.");

@@ -18,6 +18,10 @@ export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
 /** Centralized, typed server configuration. Never import from client components. */
 export const env = {
+  /** "web" (stardoom.org: Privy login, Docker sandbox) or "desktop" (Electron app: one local user, no Docker). */
+  get appMode(): "web" | "desktop" {
+    return str("STARDOOM_MODE", "web") === "desktop" ? "desktop" : "web";
+  },
   get anthropicModel() {
     return str("ANTHROPIC_MODEL", "claude-opus-5-5");
   },
@@ -77,8 +81,8 @@ export const env = {
     return str("ROBINHOOD_RPC_URL", "https://rpc.mainnet.chain.robinhood.com");
   },
 
-  /* Aestrodom Pass (lib/nft) and sponsored launches (lib/pons/sponsor). */
-  /** AestrodomPass ERC-721 on Robinhood Chain (default: the live contract). */
+  /* Stardoom Pass (lib/nft) and sponsored launches (lib/pons/sponsor). */
+  /** StardoomPass ERC-721 on Robinhood Chain (default: the live contract). */
   get passContract() {
     return str("PASS_CONTRACT_ADDRESS", "0xeaa60c3abe6259042ff099c4200cb2c1b0db46f0");
   },
@@ -94,55 +98,16 @@ export const env = {
     return int("FREE_LAUNCH_DAILY_CAP", 500);
   },
 
-  /* Credits & API keys (lib/billing). Top-ups are in USD, paid in $AESTRODOM at the live curve price. */
-  get creditsTreasury() {
-    return str("CREDITS_TREASURY_ADDRESS", "0x13d471c30f28081fac917a2112478548978eff86");
-  },
-  get creditsToken() {
-    return str("CREDITS_TOKEN_ADDRESS", "0x72c11afca4c6a30e01fadce6526cc35d857f4f20");
-  },
-  /** Credits per US dollar topped up. 0 turns buying off. */
-  get creditsPerUsd() {
-    return int("CREDITS_PER_USD", 100);
-  },
-  /** Preset top-up amounts in USD shown as buttons. */
-  get topupOptions() {
-    const opts = str("CREDIT_TOPUP_OPTIONS", "1,5,10,25")
-      .split(",")
-      .map((v) => Number(v.trim()))
-      .filter((v) => Number.isFinite(v) && v > 0);
-    return opts.length ? opts : [1, 5, 10, 25];
-  },
-  get topupMinUsd() {
-    return Number(str("CREDIT_TOPUP_MIN_USD", "1")) || 1;
-  },
-  get topupMaxUsd() {
-    return Number(str("CREDIT_TOPUP_MAX_USD", "500")) || 500;
-  },
   /**
-   * Claude list prices in USD per million tokens, for the model in ANTHROPIC_MODEL (defaults: Claude Opus 5.5).
-   * Cache writes are 5-minute ephemeral writes (1.25× input). Keep these in step with Anthropic's pricing page.
+   * Fallback $STARDOOM address. The live value is set by an admin at /admin (lib/site-settings.ts) and wins
+   * over this; empty means "not launched yet".
    */
-  get claudePrice() {
-    const p = (name: string, fallback: number) => {
-      const v = Number(str(name, String(fallback)));
-      return Number.isFinite(v) && v >= 0 ? v : fallback;
-    };
-    return {
-      input: p("CLAUDE_PRICE_INPUT", 4),
-      output: p("CLAUDE_PRICE_OUTPUT", 20),
-      cacheRead: p("CLAUDE_PRICE_CACHE_READ", 0.2),
-      cacheWrite: p("CLAUDE_PRICE_CACHE_WRITE", 5),
-    };
+  get creditsToken() {
+    return str("CREDITS_TOKEN_ADDRESS", "");
   },
-  /** Margin added on top of the Claude cost when charging credits, in percent. */
-  /** Battleground voters must hold at least this much $AESTRODOM (in USD at the live price). 0 turns it off. */
+  /** Battleground voters must hold at least this much $STARDOOM (in USD at the live price). 0 turns it off. */
   get voteMinHoldUsd() {
     const v = Number(str("VOTE_MIN_HOLD_USD", "1"));
     return Number.isFinite(v) && v >= 0 ? v : 1;
-  },
-  get creditMarginPercent() {
-    const v = Number(str("CREDIT_MARGIN_PERCENT", "5"));
-    return Number.isFinite(v) && v >= 0 ? v : 5;
   },
 };

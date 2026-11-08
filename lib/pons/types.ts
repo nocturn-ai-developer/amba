@@ -90,7 +90,7 @@ export interface PreparedLaunch {
 }
 
 /**
- * Aestrodom launch policy (stricter than the protocol): creator tax between 1% and 4%, buyback off.
+ * Stardoom AI launch policy (stricter than the protocol): creator tax between 1% and 4%, buyback off.
  * Enforced in the launch form, in buildTokenParams, and when the server links a launch to a project.
  */
 export const CREATOR_TAX_POLICY = { minBps: 100, maxBps: 400, stepBps: 10 } as const;

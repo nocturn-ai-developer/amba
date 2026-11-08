@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import type { BetaTool } from "@anthropic-ai/sdk/resources/beta/messages/messages";
+import type { ToolSpec } from "./providers/types";
 import * as fsx from "@/lib/projects/filesystem";
 import { PathError, assertWritablePath, normalizeProjectPath } from "@/lib/projects/paths";
 import { formatFileTree } from "./context";
@@ -37,7 +37,7 @@ export type ToolName = keyof typeof schemas;
 
 const pathProp = { type: "string", description: "Project-relative POSIX path, e.g. src/components/Hero.tsx" } as const;
 
-export const TOOL_DEFINITIONS: BetaTool[] = [
+export const TOOL_DEFINITIONS: ToolSpec[] = [
   {
     name: "list_files",
     description: "List every file in the project with its size.",
@@ -52,7 +52,6 @@ export const TOOL_DEFINITIONS: BetaTool[] = [
     name: "write_file",
     description:
       "Create a file or replace its entire contents. Parent directories are created automatically. Use for new files or near-total rewrites; prefer edit_file for targeted changes.",
-    eager_input_streaming: true,
     input_schema: {
       type: "object",
       properties: { path: pathProp, content: { type: "string", description: "Complete file contents" } },
@@ -64,7 +63,6 @@ export const TOOL_DEFINITIONS: BetaTool[] = [
     name: "edit_file",
     description:
       "Replace an exact, unique snippet of an existing file. old_string must match the current file exactly (including whitespace) and occur once unless replace_all is true.",
-    eager_input_streaming: true,
     input_schema: {
       type: "object",
       properties: {

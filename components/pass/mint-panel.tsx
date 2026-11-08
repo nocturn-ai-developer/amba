@@ -101,7 +101,7 @@ function Inner({ signedIn }: { signedIn: boolean }) {
       setTx(hash);
       const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 120_000 });
       if (receipt.status !== "success") throw new Error("The mint transaction reverted.");
-      toast.success("Your Aestrodom Pass is minted");
+      toast.success("Your Stardoom Pass is minted");
       load();
     } catch (err) {
       const d = describeLaunchError(err);
@@ -121,7 +121,7 @@ function Inner({ signedIn }: { signedIn: boolean }) {
       <div className="border border-border p-6">
         <div className="font-mono text-[12px] uppercase tracking-[0.16em] text-subtle">Status</div>
         <p className="mt-2 text-lg font-medium">Minting opens soon.</p>
-        <p className="mt-1 text-sm text-muted">Follow @aestrodom_ai on X for the mint announcement.</p>
+        <p className="mt-1 text-sm text-muted">Follow @stardoom_ai on X for the mint announcement.</p>
       </div>
     );
   }
@@ -194,7 +194,7 @@ function Inner({ signedIn }: { signedIn: boolean }) {
               ? `${status.freeLaunchesLeft} free launch${status.freeLaunchesLeft === 1 ? "" : "es"} available today. Open a deployed project and press Launch Token.`
               : "Today's free launch is used. It resets at 00:00 UTC."}
           </p>
-          {!signedIn && <p className="mt-1 text-muted">Sign in to Aestrodom to build an app and launch its token.</p>}
+          {!signedIn && <p className="mt-1 text-muted">Sign in to Stardoom AI to build an app and launch its token.</p>}
         </div>
       )}
 

@@ -1,4 +1,4 @@
-// Deploys contracts/AestrodomPass.sol (compiled artifact: contracts/AestrodomPass.json) to Robinhood Chain.
+// Deploys contracts/StardoomPass.sol (compiled artifact: contracts/StardoomPass.json) to Robinhood Chain.
 //
 //   node scripts/deploy-pass.mjs            # dry run: prints what would be deployed and the cost
 //   node scripts/deploy-pass.mjs --send     # deploys and prints the contract address
@@ -23,7 +23,7 @@ if (!raw) {
   process.exit(1);
 }
 const account = privateKeyToAccount(raw.startsWith("0x") ? raw : `0x${raw}`);
-const artifact = JSON.parse(readFileSync(new URL("../contracts/AestrodomPass.json", import.meta.url), "utf8"));
+const artifact = JSON.parse(readFileSync(new URL("../contracts/StardoomPass.json", import.meta.url), "utf8"));
 const hoursArg = process.argv.find((a) => a.startsWith("--open-in-hours="));
 const openInHours = hoursArg ? Number(hoursArg.split("=")[1]) : 0;
 if (!Number.isFinite(openInHours) || openInHours < 0) {

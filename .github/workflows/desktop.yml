@@ -1,0 +1,45 @@
+name: Desktop app
+
+# Builds the Stardoom desktop installers. Native parts (PostgreSQL, the build toolchain, the Prisma engine)
+# are per platform, so each installer is built on its own OS/architecture.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["desktop-v*"]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest # Stardoom-Setup-x.y.z-x64.exe
+          - os: macos-14 # Apple Silicon .dmg
+          - os: macos-13 # Intel .dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install app dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install project build toolchain
+        run: npm ci --no-audit --no-fund
+        working-directory: runtime
+      - name: Install desktop dependencies
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+        working-directory: desktop
+      - name: Build installer
+        run: node desktop/build.mjs
+        env:
+          # Unsigned for now. Add CSC_LINK / CSC_KEY_PASSWORD (and Apple notarization secrets) to sign.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stardoom-${{ matrix.os }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.dmg
+          if-no-files-found: error

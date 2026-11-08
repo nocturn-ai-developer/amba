@@ -1,0 +1,21 @@
+{
+  "name": "stardoom-desktop",
+  "productName": "Stardoom AI",
+  "version": "0.1.0",
+  "description": "Build apps with AI on your own computer.",
+  "author": "Stardoom",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "embedded-postgres": "17.5.0-beta.15",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  }
+}

@@ -68,7 +68,7 @@ export function PreviewPanel({
             key={`${url}-${version}-${reload}`}
             src={url}
             title="Live preview"
-            // No allow-same-origin: preview code runs in an opaque origin and cannot reach Aestrodom.
+            // No allow-same-origin: preview code runs in an opaque origin and cannot reach Stardoom AI.
             sandbox="allow-scripts allow-forms allow-popups allow-modals"
             referrerPolicy="no-referrer"
             className="h-full rounded-none border-0 bg-white transition-[width] duration-300 md:rounded-lg md:border md:border-border"

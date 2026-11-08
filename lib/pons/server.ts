@@ -117,11 +117,11 @@ export async function verifyLaunch(project: Project, txHash: Hex) {
   if (info.socials.website.replace(/\/$/, "").toLowerCase() !== expected) {
     throw new LaunchVerificationError("Token website does not match this project.");
   }
-  // Aestrodom policy: creator tax 1–4%, buyback off.
+  // Stardoom AI policy: creator tax 1–4%, buyback off.
   if (launched.creatorTaxBps < CREATOR_TAX_POLICY.minBps || launched.creatorTaxBps > CREATOR_TAX_POLICY.maxBps) {
     throw new LaunchVerificationError("Token creator tax is outside the allowed 1–4% range.");
   }
-  if (launched.buybackEnabled !== BUYBACK_ENABLED) throw new LaunchVerificationError("Token buyback setting does not match Aestrodom policy.");
+  if (launched.buybackEnabled !== BUYBACK_ENABLED) throw new LaunchVerificationError("Token buyback setting does not match Stardoom AI policy.");
   return {
     event,
     launched,

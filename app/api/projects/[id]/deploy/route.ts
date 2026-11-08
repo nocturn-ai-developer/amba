@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { env } from "@/lib/env";
 import { z } from "zod";
 import { ApiError, enforceRateLimit, parseJson, requireProject, requireUser, route } from "@/lib/api";
 import { LIMITS } from "@/lib/rate-limit";
@@ -15,11 +16,12 @@ const schema = z.object({ slug: z.string().trim().toLowerCase().max(48).optional
 
 /** Deploys the project, optionally moving it to a new subdomain first (availability re-checked here). */
 export const POST = route<{ id: string }>(async (req, { params }) => {
+  if (env.appMode === "desktop") throw new ApiError(400, "Use Publish to put desktop projects online.");
   const user = await requireUser();
   let project = await requireProject((await params).id, user.id);
   await enforceRateLimit(`deploy:${user.id}`, LIMITS.deploy);
   const body = await parseJson(req, schema, 1024);
-  if (isAgentRunning(project.id)) throw new ApiError(409, "Wait for Claude to finish before deploying.");
+  if (isAgentRunning(project.id)) throw new ApiError(409, "Wait for the AI to finish before deploying.");
   if (project.status === "CREATING") throw new ApiError(409, "The project has not been generated yet.");
 
   const slugChanged = !!body.slug && body.slug !== project.slug;

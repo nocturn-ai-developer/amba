@@ -1,4 +1,4 @@
-/** AestrodomPass (contracts/AestrodomPass.sol): only the functions Aestrodom calls. */
+/** StardoomPass (contracts/StardoomPass.sol): only the functions Stardoom calls. */
 export const PASS_ABI = [
   { type: "function", name: "mint", stateMutability: "nonpayable", inputs: [], outputs: [{ name: "tokenId", type: "uint256" }] },
   { type: "function", name: "totalSupply", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
@@ -50,9 +50,9 @@ export function nextReset(d = new Date()) {
  */
 export function freeLaunchMessage(projectId: string, wallet: string, issuedAt: string) {
   return [
-    "Aestrodom free token launch",
+    "Stardoom free token launch",
     "",
-    "I hold an Aestrodom Pass and want Aestrodom to pay the launch fee for this project.",
+    "I hold an Stardoom Pass and want Stardoom to pay the launch fee for this project.",
     "Creator fees go to this wallet.",
     "",
     `Project: ${projectId}`,

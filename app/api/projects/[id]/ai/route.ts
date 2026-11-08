@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { ApiError, enforceRateLimit, parseJson, requireProject, requireUser, route } from "@/lib/api";
 import { LIMITS } from "@/lib/rate-limit";
-import { assertAiQuota } from "@/lib/ai/usage";
+import { resolveProvider } from "@/lib/ai/settings";
 import { isAgentRunning, runAgent, type AgentEvent } from "@/lib/ai/agent";
 import { SKILL_IDS, normalizeSkills } from "@/lib/skills";
 
@@ -19,7 +19,7 @@ const schema = z.union([
 ]);
 
 /**
- * Starts a Claude agent run for the project and streams progress as NDJSON (one AgentEvent per line).
+ * Starts an agent run (with the user's own AI provider) for the project and streams progress as NDJSON (one AgentEvent per line).
  * The run continues to completion even if the browser disconnects; results are persisted.
  */
 export const POST = route<{ id: string }>(async (req, { params }) => {
@@ -41,8 +41,8 @@ export const POST = route<{ id: string }>(async (req, { params }) => {
     prompt = body.prompt;
   }
   if (prompt.length > env.maxPromptChars) throw new ApiError(413, `Keep requests under ${env.maxPromptChars} characters.`);
-  if (isAgentRunning(project.id)) throw new ApiError(409, "Claude is already working on this project.");
-  const { billing } = await assertAiQuota(user);
+  if (isAgentRunning(project.id)) throw new ApiError(409, "The AI is already working on this project.");
+  const ai = await resolveProvider(user.id);
   if (body.skills) {
     const next = normalizeSkills(body.skills);
     if (next.join() !== project.skills.join()) project = await prisma.project.update({ where: { id: project.id }, data: { skills: next } });
@@ -61,7 +61,7 @@ export const POST = route<{ id: string }>(async (req, { params }) => {
         }
       };
       const heartbeat = setInterval(() => emit({ type: "status", message: "" }), 15_000);
-      runAgent({ user, project, prompt, emit, billing }).finally(() => {
+      runAgent({ user, project, prompt, emit, ai }).finally(() => {
         clearInterval(heartbeat);
         if (!closed) {
           closed = true;

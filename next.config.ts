@@ -1,3 +1,4 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const securityHeaders = [
@@ -8,6 +9,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // This folder is the app root even when a parent folder has its own lockfile (keeps .next/standalone flat).
+  outputFileTracingRoot: path.resolve(__dirname),
   poweredByHeader: false,
   // Server-only packages with native or dynamic requires.
   serverExternalPackages: ["dockerode", "ioredis", "tar-stream"],

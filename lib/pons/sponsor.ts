@@ -71,7 +71,7 @@ export async function verifyClaim(projectId: string, wallet: Address, issuedAt: 
 /** Reserves today's quota on one of the holder's passes. The unique (pass, day) key settles races. */
 async function reserve(wallet: Address, userId: string, projectId: string) {
   const held = await passesOf(wallet);
-  if (!held.length) throw new ApiError(403, "This wallet does not hold an Aestrodom Pass.", "no_pass");
+  if (!held.length) throw new ApiError(403, "This wallet does not hold an Stardoom Pass.", "no_pass");
   const day = utcDay();
   if ((await sponsoredToday(day)) >= env.freeLaunchDailyCap) {
     throw new ApiError(429, "Today's free launches are all used. Try again after 00:00 UTC.", "daily_cap");
@@ -175,7 +175,7 @@ export async function sponsoredLaunch(project: Project, userId: string, input: S
     throw new ApiError(502, d.message, "launch_failed");
   }
 
-  await addLog(project.id, "TOKEN", "INFO", `Free launch (Aestrodom Pass) submitted: ${hash}`);
+  await addLog(project.id, "TOKEN", "INFO", `Free launch (Stardoom Pass) submitted: ${hash}`);
   log.info("sponsor.launch.submitted", { userId, projectId: project.id, transactionHash: hash, pass: reservation.passTokenId });
   return reconcileLaunch(project, launch);
 }

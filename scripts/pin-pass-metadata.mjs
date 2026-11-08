@@ -1,4 +1,4 @@
-// Pins the Aestrodom Pass artwork and metadata to IPFS (Pinata) and prints the ipfs:// metadata URI.
+// Pins the Stardoom Pass artwork and metadata to IPFS (Pinata) and prints the ipfs:// metadata URI.
 //   node --env-file=.env scripts/pin-pass-metadata.mjs
 // Then the contract owner calls setMetadataURI(<uri>) (owner tools on /pass).
 import { readFileSync } from "node:fs";
@@ -20,10 +20,10 @@ async function pin(bytes, filename, mime) {
   return body.data.cid;
 }
 
-const image = await pin(readFileSync(new URL("../public/nft/aestrodom-pass.png", import.meta.url)), "aestrodom-pass.png", "image/png");
+const image = await pin(readFileSync(new URL("../public/nft/stardoom-pass.png", import.meta.url)), "stardoom-pass.png", "image/png");
 console.log(`Image:    ipfs://${image}`);
 const meta = JSON.parse(readFileSync(new URL("../public/nft/pass.json", import.meta.url), "utf8"));
 meta.image = `ipfs://${image}`;
-const metadata = await pin(new TextEncoder().encode(JSON.stringify(meta, null, 2)), "aestrodom-pass.json", "application/json");
+const metadata = await pin(new TextEncoder().encode(JSON.stringify(meta, null, 2)), "stardoom-pass.json", "application/json");
 console.log(`Metadata: ipfs://${metadata}`);
 console.log(`Gateway:  https://gateway.pinata.cloud/ipfs/${metadata}`);

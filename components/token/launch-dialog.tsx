@@ -136,7 +136,7 @@ export function LaunchDialog({
     };
   }, [open, projectId, address]);
 
-  // Aestrodom Pass holders get one sponsored launch per pass per day.
+  // Stardoom Pass holders get one sponsored launch per pass per day.
   useEffect(() => {
     if (!open || !address) {
       setPass(null);
@@ -271,7 +271,7 @@ export function LaunchDialog({
     setStep("signing");
     let sent: Hex | null = null;
     try {
-      // The user signs in their own wallet. Aestrodom never sees keys.
+      // The user signs in their own wallet. Stardoom AI never sees keys.
       const hash = await walletClient.writeContract(review.request as Parameters<typeof walletClient.writeContract>[0]);
       sent = hash;
       setTxHash(hash);
@@ -312,7 +312,7 @@ export function LaunchDialog({
     }
   }
 
-  /** Free launch: the holder signs a message (no gas), Aestrodom's sponsor wallet sends the transaction. */
+  /** Free launch: the holder signs a message (no gas), Stardoom AI's sponsor wallet sends the transaction. */
   async function claimFree() {
     if (!walletClient || !address || !prepared) return;
     setError(null);
@@ -363,7 +363,7 @@ export function LaunchDialog({
     }
   }
 
-  // Slider range: Aestrodom policy (1–4%), never above the protocol's on-chain maximum.
+  // Slider range: Stardoom AI policy (1–4%), never above the protocol's on-chain maximum.
   const taxMax = prepared ? Math.min(CREATOR_TAX_POLICY.maxBps, prepared.maxCreatorTaxBps) : CREATOR_TAX_POLICY.maxBps;
   const taxMin = CREATOR_TAX_POLICY.minBps;
   const taxUnavailable = taxMax < taxMin;
@@ -391,10 +391,10 @@ export function LaunchDialog({
                 <div className="flex items-start gap-3">
                   <Gift className="mt-0.5 size-4 shrink-0 text-accent" />
                   <div className="min-w-0 flex-1 space-y-1">
-                    <div className="font-semibold">Aestrodom Pass{pass!.passes!.length > 1 ? ` ×${pass!.passes!.length}` : ""}</div>
+                    <div className="font-semibold">Stardoom Pass{pass!.passes!.length > 1 ? ` ×${pass!.passes!.length}` : ""}</div>
                     {freeAvailable ? (
                       <p className="text-muted">
-                        You have {pass!.freeLaunchesLeft} free launch{pass!.freeLaunchesLeft === 1 ? "" : "es"} today. Aestrodom pays the launch fee and gas; creator fees go to your wallet.
+                        You have {pass!.freeLaunchesLeft} free launch{pass!.freeLaunchesLeft === 1 ? "" : "es"} today. Stardoom AI pays the launch fee and gas; creator fees go to your wallet.
                       </p>
                     ) : (
                       <p className="text-muted">
@@ -533,7 +533,7 @@ export function LaunchDialog({
             </div>
             <p className="flex items-start gap-2 text-xs text-muted">
               <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-fg" />
-              Simulated against Robinhood Chain. You will sign this transaction in your own wallet; Aestrodom never holds your keys or funds.
+              Simulated against Robinhood Chain. You will sign this transaction in your own wallet; Stardoom AI never holds your keys or funds.
             </p>
             {error && <Alert>{error}</Alert>}
             <div className="flex gap-2">
@@ -555,7 +555,7 @@ export function LaunchDialog({
         {step === "confirming" && (
           <div className="space-y-4 py-4 text-center">
             <Loader2 className="mx-auto size-6 animate-spin text-fg" />
-            <p className="text-sm">{review ? "Transaction submitted. Waiting for confirmation…" : "Aestrodom is launching your token. Waiting for confirmation…"}</p>
+            <p className="text-sm">{review ? "Transaction submitted. Waiting for confirmation…" : "Stardoom AI is launching your token. Waiting for confirmation…"}</p>
             {txHash && (
               <a href={explorerTx(txHash)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 font-mono text-xs text-muted hover:text-fg">
                 {shortAddress(txHash, 8)} <ExternalLink className="size-3" />

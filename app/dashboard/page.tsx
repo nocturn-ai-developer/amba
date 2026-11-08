@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { currentUserOrRedirect } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { planLimits } from "@/lib/plans";
+import { env } from "@/lib/env";
 import { aiUsageToday } from "@/lib/ai/usage";
 import { TEMPLATES } from "@/lib/templates";
 import { EmptyProjects, ProjectTiles, loadProjects } from "@/components/dashboard/project-list";
@@ -51,8 +52,14 @@ export default async function DashboardHome() {
         </div>
         <div className="grid grid-cols-3 gap-3 lg:grid-cols-1 lg:gap-4">
           <Plate value={total} label="Apps" />
-          <Plate value={live} label="Live" />
-          <Plate value={tokens} label="Tokens" />
+          {env.appMode === "desktop" ? (
+            <Plate value={usage.requests} label="AI runs today" />
+          ) : (
+            <>
+              <Plate value={live} label="Live" />
+              <Plate value={tokens} label="Tokens" />
+            </>
+          )}
         </div>
       </section>
 
@@ -74,10 +81,14 @@ export default async function DashboardHome() {
             <Frame />
             <div className="shimmer text-[11px]">Today</div>
             <div className="mt-4 flex justify-around">
-              <Gauge used={usage.requests} max={limits.maxAiRequestsPerDay} label="AI runs" />
               <Gauge used={total} max={limits.maxProjects} label="Apps" />
             </div>
-            <p className="mt-4 text-center text-[12px] text-subtle">{user.plan === "PRO" ? "Pro plan" : "Free plan"} · resets 00:00 UTC</p>
+            <p className="mt-4 text-center text-[12px] text-subtle">
+              {usage.requests} AI run{usage.requests === 1 ? "" : "s"} today ·{" "}
+              <Link href="/dashboard/settings" className="underline underline-offset-2 hover:text-fg">
+                AI settings
+              </Link>
+            </p>
           </div>
           <div className="border-t border-border pt-4">
             <div className="shimmer px-1 pb-2 text-[11px]">Quick starts</div>

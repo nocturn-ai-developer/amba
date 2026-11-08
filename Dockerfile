@@ -1,12 +1,17 @@
 # PRISMATIC application image (Next.js standalone).
 FROM node:22-alpine AS deps
 WORKDIR /app
+# Small hosts: Node sizes its heap from physical RAM and ignores swap; let npm/Next use swap instead of crashing.
+ARG BUILD_NODE_HEAP_MB=3072
+ENV NODE_OPTIONS=--max-old-space-size=$BUILD_NODE_HEAP_MB
 COPY package.json package-lock.json .npmrc ./
 COPY prisma ./prisma
 RUN npm ci --no-audit --no-fund
 
 FROM node:22-alpine AS build
 WORKDIR /app
+ARG BUILD_NODE_HEAP_MB=3072
+ENV NODE_OPTIONS=--max-old-space-size=$BUILD_NODE_HEAP_MB
 # Public, build-time values (inlined into the browser bundle by Next.js). Never pass secrets here.
 ARG NEXT_PUBLIC_PRIVY_APP_ID
 ARG NEXT_PUBLIC_ROBINHOOD_RPC_URL

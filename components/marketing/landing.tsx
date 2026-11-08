@@ -3,16 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, ChevronRight, Sparkles, X } from "lucide-react";
-import { TOKEN_SYMBOL, X_HANDLE, X_URL } from "@/components/brand";
-import { Corner, Frame } from "@/components/ui/corner";
+import { ArrowUpRight, Check, ChevronRight, Copy, X } from "lucide-react";
+import { BrandMark, TOKEN_SYMBOL, X_HANDLE, X_URL } from "@/components/brand";
 import type { PlatformStats } from "@/lib/stats";
 
 // Aestra, the brand character. The suit is always visible; the armour beneath shows only inside the cursor spotlight.
 // Both renders share one pose and framing, so the reveal lines up. Upscaled 2x (lanczos + light sharpen) from the
-// 1672px originals so 1920px and retina screens are not stretching them.
-const BG_IMAGE_1 = "/landing/aestra-suit.webp?v=3";
+// 1672px originals so 1920px and retina screens are not stretching them. The photo's edges fade into the black page.
+// Black-shirt edit of aestra-suit.webp (scripts/make-black-shirt.py); the armour render is unchanged.
+const BG_IMAGE_1 = "/landing/aestra-suit-black.webp?v=1";
 const BG_IMAGE_2 = "/landing/aestra-armor.webp?v=3";
+
+/** The character pair: what is always visible, and what the cursor spotlight reveals. Same pose and framing. */
+export interface HeroImages {
+  outer: string;
+  inner: string;
+}
+const DEFAULT_HERO: HeroImages = { outer: BG_IMAGE_1, inner: BG_IMAGE_2 };
 
 export interface TokenTerms {
   asOf: string;
@@ -27,18 +34,17 @@ export interface TokenTerms {
   economics: string | null;
 }
 
-/** Public pricing, formatted on the server. */
+/** The $STARDOOM contract as set by an admin at /admin; null until launch. */
+export interface TokenContract {
+  address: string;
+  short: string;
+  explorerUrl: string;
+  buyUrl: string | null;
+}
+
+/** Public plan facts, formatted on the server. */
 export interface Pricing {
-  freeRunsPerDay: number;
   freeProjects: number;
-  /** Credits per US dollar; 0 while buying is off. */
-  creditsPerUsd: number;
-  /** Preset top-up amounts in USD. */
-  options: number[];
-  /** Margin over the Claude cost per AI run, in percent. */
-  marginPercent: number;
-  /** Live USD price of one $AESTRODOM, formatted, or null if unavailable. */
-  tokenUsd: string | null;
 }
 
 type Panel = "workflow" | "features" | "token" | "pricing" | "faq" | "start";
@@ -53,19 +59,25 @@ const NAV: { id: Exclude<Panel, "start">; label: string }[] = [
 
 const SUGGESTIONS = ["Portfolio for a photographer", "Coffee shop menu", "Meme coin landing page", "Habit tracker"];
 
-/** Light landing page around the Aestra renders: one full-viewport composition, with the details in side drawers. */
+/** One full-viewport composition on black: the character centred, the pitch around it, details in side drawers. */
 export function Landing({
   signedIn,
   domain,
   stats,
   token,
+  ca = null,
   pricing,
+  hero = DEFAULT_HERO,
 }: {
   signedIn: boolean;
   domain: string;
   stats: PlatformStats | null;
   token: TokenTerms | null;
+  /** $STARDOOM contract address (admin setting). */
+  ca?: TokenContract | null;
   pricing: Pricing;
+  /** A replacement character (scripts/prepare-hero.py); defaults to Aestra. */
+  hero?: HeroImages;
 }) {
   const [panel, setPanel] = useState<Panel>("workflow");
   const [open, setOpen] = useState(false);
@@ -84,130 +96,98 @@ export function Landing({
 
   return (
     <div
-      className={`landing font-jakarta relative flex min-h-dvh flex-col justify-between overflow-hidden bg-white text-black antialiased`}
+      className={`landing font-jakarta relative flex min-h-dvh flex-col justify-between overflow-hidden bg-black text-white antialiased`}
     >
-      <ImageRevealBackground />
+      <ImageRevealBackground hero={hero} />
       <MobileBackdrop />
 
-      {/* Header */}
+      {/* Header: mark + wordmark, the section nav in one pill, account actions. */}
       <header
-        className="relative z-20 flex flex-wrap items-center justify-between gap-x-6 gap-y-3"
-        style={{ paddingInline: "var(--pad-x)", paddingTop: "var(--header-pt)", paddingBottom: "var(--section-gap)" }}
+        className="relative z-20 grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-3 lg:grid-cols-[1fr_auto_1fr]"
+        style={{ paddingInline: "var(--pad-x)", paddingTop: "var(--header-pt)" }}
       >
-        <Link
-          href="/"
-          onClick={() => setOpen(false)}
-          className="font-orbitron flex items-start font-black transition-opacity hover:opacity-80"
-          style={{ fontSize: "var(--logo)", letterSpacing: "0.15em" }}
-        >
-          AESTRODOM
-          <span className="-mt-0.5 ml-0.5" style={{ fontSize: "var(--logo-deg)" }}>
-            ˚
+        <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2.5 justify-self-start transition-opacity hover:opacity-80">
+          <BrandMark className="size-[1.4em] text-white" />
+          <span className="font-orbitron whitespace-nowrap font-black" style={{ fontSize: "var(--logo)", letterSpacing: "0.12em" }}>
+            STARDOOM AI
           </span>
         </Link>
-        {/* Phones: account links stay beside the logo and the section links drop to a full-width row below. */}
         <nav
-          className="order-last flex w-full items-center justify-between font-medium uppercase sm:order-none sm:w-auto sm:justify-start sm:gap-[var(--gap-nav)]"
-          style={{ fontSize: "var(--nav)", letterSpacing: "0.2em" }}
+          aria-label="Sections"
+          className="col-span-2 row-start-2 flex items-center justify-between gap-0.5 overflow-x-auto rounded-full border border-white/15 bg-black/45 p-1 backdrop-blur-md lg:col-span-1 lg:col-start-2 lg:row-start-1"
         >
           {NAV.map((n) => (
-            <button key={n.id} type="button" onClick={() => show(n.id)} className="whitespace-nowrap py-1 uppercase transition-opacity hover:opacity-50">
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => show(n.id)}
+              className="whitespace-nowrap rounded-full px-2.5 py-1.5 font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white sm:px-3.5"
+              style={{ fontSize: "var(--nav)" }}
+            >
               {n.label}
             </button>
           ))}
-          <span aria-hidden className="hidden text-gray-500 sm:inline">
-            |
-          </span>
-          <AccountLinks signedIn={signedIn} onStart={() => show("start")} className="hidden sm:flex" />
         </nav>
-        <AccountLinks signedIn={signedIn} onStart={() => show("start")} className="flex sm:hidden" />
+        <div className="flex items-center gap-4 justify-self-end lg:col-start-3">
+          <Link href={signedIn ? "/dashboard" : "/login"} className="hidden whitespace-nowrap font-medium text-white/70 transition-colors hover:text-white sm:inline" style={{ fontSize: "var(--nav)" }}>
+            {signedIn ? "Dashboard" : "Sign in"}
+          </Link>
+          <button
+            type="button"
+            onClick={() => show("start")}
+            className="whitespace-nowrap rounded-full bg-white px-4 py-2 font-semibold text-black transition-opacity hover:opacity-85"
+            style={{ fontSize: "var(--nav)" }}
+          >
+            Launch app
+          </button>
+        </div>
       </header>
 
-      {/* Hero */}
-      <main
-        className="relative z-10 flex flex-1 flex-col justify-between gap-7 lg:flex-row lg:gap-10"
-        style={{ paddingInline: "var(--pad-x)", paddingBlock: "var(--main-py)" }}
-      >
-        <div className="flex flex-col justify-center">
-          <div className="mb-5 flex items-center gap-3 uppercase text-gray-600 lg:hidden" style={{ fontSize: "var(--micro)", letterSpacing: "0.24em" }}>
-            <span className="h-px w-8 bg-black" />
-            AI app builder · Robinhood Chain
+      {/* Hero: the headline splits around the character; the prompt sits at her feet. */}
+      <main className="relative z-10 flex flex-1 flex-col" style={{ paddingInline: "var(--pad-x)", paddingTop: "var(--main-py)", paddingBottom: "calc(var(--main-py) * 0.6)" }}>
+        <div className="grid flex-1 items-center gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,30vw)_minmax(0,1fr)]">
+          <div className="min-w-0">
+            <p className="mb-4 font-mono uppercase text-white/55" style={{ fontSize: "var(--micro)", letterSpacing: "0.22em" }}>
+              <span className="mr-2 text-white">▲</span>AI app builder
+            </p>
+            <h1 className="font-orbitron font-black uppercase" style={{ fontSize: "var(--headline)", letterSpacing: "0.06em", lineHeight: 0.98 }}>
+              Build
+              <br />
+              anything
+              <span className="lg:hidden"> with AI.</span>
+            </h1>
+            <p className="mt-5 max-w-[24rem] leading-relaxed text-white/60" style={{ fontSize: "var(--body)" }}>
+              Describe your idea in one sentence. The AI writes the code, and your app goes live on its own domain.
+            </p>
           </div>
-          <Corner pos="tl" />
-          <h1
-            className="font-orbitron my-[var(--section-gap)] font-extrabold uppercase"
-            style={{ fontSize: "var(--headline)", letterSpacing: "0.08em", lineHeight: 1.05 }}
-          >
-            <span className="block">Build</span>
-            <span className="block">Anything</span>
-            <span className="flex items-center gap-[0.25em] whitespace-nowrap">
-              With AI
-              <Checker />
-            </span>
-          </h1>
-          <Corner pos="bl" />
-          <p className="mt-5 max-w-[22rem] leading-relaxed text-gray-600 lg:hidden" style={{ fontSize: "var(--body)" }}>
-            Describe your idea in one sentence. Claude builds it, and it goes live on its own domain.
-          </p>
-          <div className="mt-[calc(var(--section-gap)*2)] flex flex-col gap-3 sm:flex-row sm:items-center">
-            {/* Phones: solid, full-width primary; from lg the original outlined button. */}
-            <button
-              type="button"
-              onClick={() => show("start")}
-              className="group flex items-center justify-between rounded-md border border-black bg-black font-semibold uppercase text-white transition-colors hover:bg-white hover:text-black sm:w-fit sm:justify-start lg:border-gray-500 lg:bg-transparent lg:text-black lg:hover:border-black lg:hover:bg-black lg:hover:text-white"
-              style={{ gap: "var(--btn-gap)", fontSize: "var(--body)", letterSpacing: "0.18em", paddingInline: "var(--btn-px)", paddingBlock: "var(--btn-py)" }}
-            >
-              Start building
-              <ArrowUpRight strokeWidth={1.5} className="size-[1.2em] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => show("workflow")}
-              className="flex items-center justify-center gap-2 rounded-md border border-gray-300 font-semibold uppercase text-gray-700 transition-colors hover:border-black hover:text-black sm:w-fit lg:hidden"
-              style={{ fontSize: "var(--body)", letterSpacing: "0.18em", paddingInline: "var(--btn-px)", paddingBlock: "var(--btn-py)" }}
-            >
-              How it works
-            </button>
+
+          {/* The character stands here (background layer). */}
+          <div aria-hidden className="hidden lg:block" />
+
+          <div className="hidden min-w-0 text-right lg:block">
+            <p className="mb-4 font-mono uppercase text-white/55" style={{ fontSize: "var(--micro)", letterSpacing: "0.22em" }}>
+              Web · Windows · macOS
+            </p>
+            <p className="font-orbitron font-black uppercase" style={{ fontSize: "var(--headline)", letterSpacing: "0.06em", lineHeight: 0.98 }}>
+              With
+              <br />
+              AI.
+            </p>
+            <p className="ml-auto mt-5 max-w-[22rem] leading-relaxed text-white/60" style={{ fontSize: "var(--body)" }}>
+              Your own Anthropic key on the web, or a local model on your computer. Every app can launch its own token on Robinhood Chain.
+            </p>
           </div>
         </div>
 
-        <div className="relative self-stretch sm:self-end lg:min-w-[var(--feature-min)]" style={{ padding: "var(--feature-pad)" }}>
-          <Frame />
-          <Globe />
-          <p className="mt-[var(--section-gap)] font-semibold uppercase leading-relaxed" style={{ fontSize: "var(--body)", letterSpacing: "0.18em" }}>
-            Describe it.
-            <br />
-            Live on its own domain.
-          </p>
-          {stats && (
-            <>
-              <p className="mt-2 hidden uppercase text-gray-600 lg:block" style={{ fontSize: "var(--micro)", letterSpacing: "0.18em" }}>
-                {stats.projects.toLocaleString("en-US")} apps built · {stats.liveDeployments.toLocaleString("en-US")} live now
-              </p>
-              <dl className="mt-4 grid grid-cols-2 border-t border-gray-200 pt-4 lg:hidden">
-                <MobileStat value={stats.projects} label="Apps built" />
-                <MobileStat value={stats.liveDeployments} label="Live now" />
-              </dl>
-            </>
-          )}
-        </div>
+        <HeroPrompt signedIn={signedIn} stats={stats} />
       </main>
 
-      {/* Phones: a quiet sign-off instead of the image. */}
-      <footer
-        className="relative z-10 flex items-center justify-between border-t border-gray-200 uppercase text-gray-500 lg:hidden"
-        style={{ marginInline: "var(--pad-x)", paddingBlock: "var(--pad-y)", fontSize: "var(--micro)", letterSpacing: "0.2em" }}
-      >
-        <span>© {new Date().getFullYear()} Aestrodom</span>
-        <a href={X_URL} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-black">
-          @{X_HANDLE}
-        </a>
-      </footer>
+      <Ticker ca={ca} />
 
       <Drawer open={open} panel={panel} onClose={() => setOpen(false)}>
         {panel === "workflow" && <WorkflowPanel domain={domain} />}
         {panel === "features" && <FeaturesPanel domain={domain} />}
-        {panel === "token" && <TokenPanel token={token} />}
+        {panel === "token" && <TokenPanel token={token} ca={ca} />}
         {panel === "pricing" && <PricingPanel pricing={pricing} signedIn={signedIn} />}
         {panel === "faq" && <FaqPanel domain={domain} />}
         {panel === "start" && <StartPanel signedIn={signedIn} />}
@@ -216,28 +196,96 @@ export function Landing({
   );
 }
 
-function AccountLinks({ signedIn, onStart, className }: { signedIn: boolean; onStart: () => void; className: string }) {
+
+
+/** Inline prompt in the hero: type the idea, Generate opens the builder with it (sign-in first if needed). */
+function HeroPrompt({ signedIn, stats }: { signedIn: boolean; stats: PlatformStats | null }) {
+  const router = useRouter();
+  const [value, setValue] = useState("");
+  function go(text = value) {
+    const prompt = text.trim().slice(0, 2000);
+    const target = prompt ? `/dashboard/new?prompt=${encodeURIComponent(prompt)}` : "/dashboard/new";
+    router.push(signedIn ? target : `/login?callbackUrl=${encodeURIComponent(target)}`);
+  }
   return (
-    <div className={`items-center font-medium uppercase ${className}`} style={{ gap: "var(--gap-nav)", fontSize: "var(--nav)", letterSpacing: "0.2em" }}>
-      <Link href={signedIn ? "/dashboard" : "/login"} className="whitespace-nowrap transition-opacity hover:opacity-50">
-        {signedIn ? "Dashboard" : "Sign in"}
-      </Link>
-      <button type="button" onClick={onStart} aria-label="Start a new project" className="transition-opacity hover:opacity-50">
-        <Sparkles strokeWidth={1.5} style={{ width: "var(--icon)", height: "var(--icon)" }} />
-      </button>
+    <div className="mx-auto mt-8 w-full max-w-[44rem]">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          go();
+        }}
+        className="flex items-center gap-2 rounded-2xl border border-white/15 bg-black/55 p-2 pl-4 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.9)] backdrop-blur-md transition-colors focus-within:border-white/40"
+      >
+        <span aria-hidden className="font-mono text-white/40" style={{ fontSize: "var(--body)" }}>
+          &gt;
+        </span>
+        <input
+          id="hero-prompt"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          maxLength={2000}
+          placeholder="A booking page for my pottery studio…"
+          aria-label="Describe the app you want to build"
+          className="min-w-0 flex-1 bg-transparent py-2 text-white outline-none placeholder:text-white/35"
+          style={{ fontSize: "var(--body)" }}
+        />
+        <button
+          type="submit"
+          className="flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 font-semibold uppercase text-black transition-opacity hover:opacity-85"
+          style={{ fontSize: "var(--micro)", letterSpacing: "0.16em" }}
+        >
+          Generate <ArrowUpRight strokeWidth={2} className="size-[1.2em]" />
+        </button>
+      </form>
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+        {SUGGESTIONS.map((sug) => (
+          <button
+            key={sug}
+            type="button"
+            onClick={() => setValue(sug)}
+            className="rounded-full border border-white/15 bg-black/40 px-3 py-1 text-white/65 backdrop-blur transition-colors hover:border-white/40 hover:text-white"
+            style={{ fontSize: "var(--micro)" }}
+          >
+            {sug}
+          </button>
+        ))}
+      </div>
+      {stats && (
+        <p className="mt-3 text-center font-mono uppercase text-white/40" style={{ fontSize: "var(--micro)", letterSpacing: "0.18em" }}>
+          {stats.projects.toLocaleString("en-US")} apps built · {stats.liveDeployments.toLocaleString("en-US")} live now
+        </p>
+      )}
     </div>
   );
 }
 
-function MobileStat({ value, label }: { value: number; label: string }) {
+const TICKER_ITEMS = [TOKEN_SYMBOL.startsWith("$") ? TOKEN_SYMBOL : `$${TOKEN_SYMBOL}`, "Robinhood Chain", "Describe it", "AI builds it", "Live on its own domain", "Web · Windows · macOS", "Local AI or your own key", `@${X_HANDLE}`];
+
+/** Bottom strip: the pitch scrolling by, set in mono like a market ticker. The CA joins it once set. */
+function Ticker({ ca }: { ca: TokenContract | null }) {
+  const items: React.ReactNode[] = [...TICKER_ITEMS];
+  // Hex stays in its own case: an uppercased "0X…" reads wrong and gets mistyped.
+  if (ca) items.splice(1, 0, <>CA <span className="normal-case">{ca.short}</span></>);
+  const row = (
+    <div className="flex shrink-0 items-center">
+      {items.map((t, i) => (
+        <span key={i} className="flex items-center whitespace-nowrap px-6">
+          <span aria-hidden className="mr-6 text-white/30">
+            ▲
+          </span>
+          {t}
+        </span>
+      ))}
+    </div>
+  );
   return (
-    <div className="pr-3">
-      <dd className="font-orbitron font-bold tabular-nums" style={{ fontSize: "calc(var(--logo) * 1.1)" }}>
-        {value.toLocaleString("en-US")}
-      </dd>
-      <dt className="mt-1 uppercase text-gray-500" style={{ fontSize: "var(--micro)", letterSpacing: "0.18em" }}>
-        {label}
-      </dt>
+    <div className="relative z-10 overflow-hidden border-t border-white/10 bg-black/60 py-3 font-mono uppercase text-white/70 backdrop-blur" style={{ fontSize: "var(--micro)", letterSpacing: "0.18em" }}>
+      <div className="landing-ticker flex w-max">
+        {row}
+        <div aria-hidden className="flex">
+          {row}
+        </div>
+      </div>
     </div>
   );
 }
@@ -246,14 +294,14 @@ function MobileStat({ value, label }: { value: number; label: string }) {
 /* Interactive background                                              */
 /* ------------------------------------------------------------------ */
 
-/** Below lg: a faint grid that fades out toward the bottom, in place of the photo background. */
+/** Below lg: a faint grid on black, in place of the photo background. */
 function MobileBackdrop() {
   return (
     <div
       aria-hidden
       className="pointer-events-none absolute inset-0 z-0 lg:hidden"
       style={{
-        backgroundImage: "linear-gradient(to right, #e5e7eb 1px, transparent 1px), linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)",
+        backgroundImage: "linear-gradient(to right, rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.07) 1px, transparent 1px)",
         backgroundSize: "44px 44px",
         maskImage: "linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.5) 45%, transparent 85%)",
         WebkitMaskImage: "linear-gradient(to bottom, #000 0%, rgba(0,0,0,0.5) 45%, transparent 85%)",
@@ -262,22 +310,34 @@ function MobileBackdrop() {
   );
 }
 
-// The mask canvas is drawn at a fraction of the viewport; the gradient is soft, so upscaling is invisible.
+// The mask canvas is drawn at a fraction of the photo size; the gradient is soft, so upscaling is invisible.
 const MASK_SCALE = 0.25;
 
-/** Desktop only: BG_IMAGE_2 is revealed through a soft spotlight that trails the cursor, over a parallax grid. */
-function ImageRevealBackground() {
+// The photo starts just below the header so the hood clears the navigation.
+const PHOTO_TOP = "clamp(3.5rem, 9vh, 6rem)";
+
+// Edges of the photo melt into the black page; the middle (where she stands) stays clear.
+const FADE = [
+  "linear-gradient(to bottom, #000 0%, rgba(0,0,0,0) 14%)",
+  "linear-gradient(to top, #000 0%, rgba(0,0,0,0) 8%)",
+  "linear-gradient(to right, #000 0%, rgba(0,0,0,0.8) 10%, rgba(0,0,0,0.35) 20%, rgba(0,0,0,0) 30%, rgba(0,0,0,0) 70%, rgba(0,0,0,0.35) 80%, rgba(0,0,0,0.8) 90%, #000 100%)",
+].join(", ");
+
+/** Desktop only: the inner image is revealed through a soft spotlight that trails the cursor, over a parallax grid. */
+function ImageRevealBackground({ hero }: { hero: HeroImages }) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const photoRef = useRef<HTMLDivElement>(null);
   const revealRef = useRef<HTMLDivElement>(null);
   const patternRef = useRef<SVGPatternElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
 
   useEffect(() => {
     const root = rootRef.current;
+    const photo = photoRef.current;
     const reveal = revealRef.current;
     const pattern = patternRef.current;
     const path = pathRef.current;
-    if (!root || !reveal || !pattern || !path) return;
+    if (!root || !photo || !reveal || !pattern || !path) return;
     // Skip the whole loop when the background is hidden (below lg).
     if (!window.matchMedia("(min-width: 1024px)").matches) return;
 
@@ -288,17 +348,15 @@ function ImageRevealBackground() {
     const mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     const smooth = { ...mouse };
     const grid = { x: 0, y: 0 };
-    let last = { x: NaN, y: NaN };
+    let last = { x: NaN, y: NaN, w: 0, h: 0 };
     let frame = 0;
 
     const resize = () => {
-      canvas.width = Math.max(1, Math.round(window.innerWidth * MASK_SCALE));
-      canvas.height = Math.max(1, Math.round(window.innerHeight * MASK_SCALE));
       const cell = Math.round(Math.min(64, Math.max(36, window.innerWidth * 0.028)));
       pattern.setAttribute("width", String(cell));
       pattern.setAttribute("height", String(cell));
       path.setAttribute("d", `M ${cell} 0 L 0 0 0 ${cell}`);
-      last = { x: NaN, y: NaN };
+      last = { x: NaN, y: NaN, w: 0, h: 0 };
     };
     const onMove = (e: MouseEvent) => {
       mouse.x = e.clientX;
@@ -309,13 +367,19 @@ function ImageRevealBackground() {
       smooth.x += (mouse.x - smooth.x) * 0.1;
       smooth.y += (mouse.y - smooth.y) * 0.1;
 
+      // The mask covers the photo box (it starts below the wordmark), so cursor positions are taken relative to it.
+      const r = photo.getBoundingClientRect();
+      const w = Math.max(1, Math.round(r.width * MASK_SCALE));
+      const h = Math.max(1, Math.round(r.height * MASK_SCALE));
       // Only redraw the mask while the spotlight is still moving.
-      if (Math.abs(smooth.x - last.x) > 0.1 || Math.abs(smooth.y - last.y) > 0.1 || Number.isNaN(last.x)) {
-        last = { ...smooth };
+      if (Math.abs(smooth.x - last.x) > 0.1 || Math.abs(smooth.y - last.y) > 0.1 || Number.isNaN(last.x) || w !== last.w || h !== last.h) {
+        last = { x: smooth.x, y: smooth.y, w, h };
+        canvas.width = w;
+        canvas.height = h;
         const radius = Math.round(Math.min(420, Math.max(160, window.innerWidth * 0.16))) * MASK_SCALE;
-        const cx = smooth.x * MASK_SCALE;
-        const cy = smooth.y * MASK_SCALE;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const cx = (smooth.x - r.left) * MASK_SCALE;
+        const cy = (smooth.y - r.top) * MASK_SCALE;
+        ctx.clearRect(0, 0, w, h);
         const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
         g.addColorStop(0, "rgba(255,255,255,1)");
         g.addColorStop(0.4, "rgba(255,255,255,1)");
@@ -333,9 +397,9 @@ function ImageRevealBackground() {
       }
 
       // Grid drifts against the cursor.
-      const r = root.getBoundingClientRect();
-      const nx = (smooth.x - r.left) / r.width - 0.5;
-      const ny = (smooth.y - r.top) / r.height - 0.5;
+      const rr = root.getBoundingClientRect();
+      const nx = (smooth.x - rr.left) / rr.width - 0.5;
+      const ny = (smooth.y - rr.top) / rr.height - 0.5;
       grid.x += (nx * 16 - grid.x) * 0.06;
       grid.y += (ny * 16 - grid.y) * 0.06;
       pattern.setAttribute("x", grid.x.toFixed(2));
@@ -355,19 +419,22 @@ function ImageRevealBackground() {
     };
   }, []);
 
-  const layer = "absolute inset-0 bg-cover bg-center bg-no-repeat";
+  const layer = "absolute inset-0 bg-cover bg-top bg-no-repeat";
   return (
-    <div ref={rootRef} aria-hidden className="pointer-events-none fixed inset-0 z-0 hidden overflow-hidden lg:block">
-      <div className={layer} style={{ backgroundImage: `url("${BG_IMAGE_1}")` }} />
-      <div
-        ref={revealRef}
-        className={layer}
-        style={{ backgroundImage: `url("${BG_IMAGE_2}")`, maskSize: "100% 100%", WebkitMaskSize: "100% 100%", maskRepeat: "no-repeat", WebkitMaskRepeat: "no-repeat" }}
-      />
-      <svg className="absolute inset-0 size-full" style={{ opacity: 0.1 }}>
+    <div ref={rootRef} aria-hidden className="pointer-events-none fixed inset-0 z-0 hidden overflow-hidden bg-black lg:block">
+      <div ref={photoRef} className="absolute inset-x-0 bottom-0" style={{ top: PHOTO_TOP }}>
+        <div className={layer} style={{ backgroundImage: `url("${hero.outer}")` }} />
+        <div
+          ref={revealRef}
+          className={layer}
+          style={{ backgroundImage: `url("${hero.inner}")`, maskSize: "100% 100%", WebkitMaskSize: "100% 100%", maskRepeat: "no-repeat", WebkitMaskRepeat: "no-repeat" }}
+        />
+        <div className="absolute inset-0" style={{ backgroundImage: FADE }} />
+      </div>
+      <svg className="absolute inset-0 size-full" style={{ opacity: 0.12 }}>
         <defs>
           <pattern ref={patternRef} id="landing-grid" width="48" height="48" patternUnits="userSpaceOnUse">
-            <path ref={pathRef} d="M 48 0 L 0 0 0 48" fill="none" stroke="#64748b" strokeWidth="0.6" />
+            <path ref={pathRef} d="M 48 0 L 0 0 0 48" fill="none" stroke="#94a3b8" strokeWidth="0.6" />
           </pattern>
         </defs>
         <rect width="100%" height="100%" fill="url(#landing-grid)" />
@@ -384,7 +451,7 @@ const TITLES: Record<Panel, string> = {
   workflow: "Workflow",
   features: "Features",
   token: "Token Launch",
-  pricing: "API & Credits",
+  pricing: "API & Pricing",
   faq: "FAQ",
   start: "New Project",
 };
@@ -397,7 +464,7 @@ function Drawer({ open, panel, onClose, children }: { open: boolean; panel: Pane
         role="dialog"
         aria-modal="true"
         aria-label={TITLES[panel]}
-        className={`absolute inset-y-0 right-0 flex w-full flex-col border-l border-gray-200 bg-white transition-transform duration-300 ease-out sm:max-w-[var(--drawer-max)] ${open ? "translate-x-0" : "translate-x-full"}`}
+        className={`absolute inset-y-0 right-0 flex w-full flex-col border-l border-gray-200 bg-white text-black transition-transform duration-300 ease-out sm:max-w-[var(--drawer-max)] ${open ? "translate-x-0" : "translate-x-full"}`}
         style={{ padding: "var(--drawer-pad)" }}
       >
         <div className="flex items-center justify-between border-b border-gray-200 pb-[var(--section-gap)]">
@@ -410,7 +477,7 @@ function Drawer({ open, panel, onClose, children }: { open: boolean; panel: Pane
         </div>
         <div className="-mx-1 flex-1 overflow-y-auto px-1 py-[var(--section-gap)]">{children}</div>
         <div className="border-t border-gray-200 pt-[var(--section-gap)] text-center uppercase text-gray-500" style={{ fontSize: "var(--micro)", letterSpacing: "0.18em" }}>
-          Aestrodom © {new Date().getFullYear()} — Build anything with AI
+          Stardoom AI © {new Date().getFullYear()} — Build anything with AI
           <a href={X_URL} target="_blank" rel="noopener noreferrer" className="mt-1 block transition-colors hover:text-black">
             @{X_HANDLE} on X
           </a>
@@ -503,7 +570,63 @@ function FeaturesPanel({ domain }: { domain: string }) {
   );
 }
 
-function TokenPanel({ token }: { token: TokenTerms | null }) {
+/** The official $STARDOOM contract with copy / explorer / buy, or a launch notice before it is set. */
+function ContractAddress({ ca }: { ca: TokenContract | null }) {
+  const [copied, setCopied] = useState(false);
+  const micro = { fontSize: "var(--micro)", letterSpacing: "0.18em" } as const;
+  if (!ca) {
+    return (
+      <div className="mb-6 border border-dashed border-gray-300 px-3 py-3">
+        <div className="uppercase text-gray-500" style={micro}>
+          Contract address
+        </div>
+        <p className="mt-1 font-semibold" style={{ fontSize: "var(--body)" }}>
+          Announced at launch.
+        </p>
+        <p className="mt-1 text-gray-500" style={{ fontSize: "var(--micro)" }}>
+          Only trust the CA posted on stardoom.org and @{X_HANDLE}.
+        </p>
+      </div>
+    );
+  }
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(ca.address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked; the address is selectable */
+    }
+  };
+  return (
+    <div className="mb-6 border border-gray-200 px-3 py-3">
+      <div className="flex items-center justify-between uppercase text-gray-500" style={micro}>
+        <span>Contract address</span>
+        <span>Robinhood Chain</span>
+      </div>
+      <div className="mt-1.5 flex items-center gap-2">
+        <code className="min-w-0 flex-1 select-all break-all font-mono font-semibold" style={{ fontSize: "var(--body)" }}>
+          {ca.address}
+        </code>
+        <button type="button" onClick={copy} aria-label="Copy contract address" className="shrink-0 rounded-full border border-gray-200 p-1.5 text-gray-600 hover:border-black hover:text-black">
+          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+        </button>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 uppercase text-gray-500" style={micro}>
+        <a href={ca.explorerUrl} target="_blank" rel="noopener noreferrer" className="hover:text-black">
+          Explorer ↗
+        </a>
+        {ca.buyUrl && (
+          <a href={ca.buyUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-black hover:underline">
+            Buy ${TOKEN_SYMBOL} ↗
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TokenPanel({ token, ca }: { token: TokenTerms | null; ca: TokenContract | null }) {
   const terms: [string, string][] = token
     ? [
         ["Launch fee", token.launchFee],
@@ -523,6 +646,7 @@ function TokenPanel({ token }: { token: TokenTerms | null }) {
   return (
     <>
       <Subtitle>${TOKEN_SYMBOL}</Subtitle>
+      <ContractAddress ca={ca} />
       <Subtitle>Pons V2 · Robinhood Chain</Subtitle>
       <p className="leading-relaxed text-gray-600" style={{ fontSize: "var(--body)" }}>
         Give your app a token in one signature. Terms are read from the factory again in your browser right before you sign.
@@ -575,59 +699,36 @@ function TokenPanel({ token }: { token: TokenTerms | null }) {
 }
 
 function PricingPanel({ pricing, signedIn }: { pricing: Pricing; signedIn: boolean }) {
-  const target = "/dashboard/billing";
+  const target = "/dashboard/settings";
   return (
     <>
-      <Subtitle>Start free</Subtitle>
+      <Subtitle>Bring your own key</Subtitle>
       <ul>
         <Row
           label="Free"
           title="Every account"
-          body={`${pricing.freeRunsPerDay} AI runs a day in the builder, up to ${pricing.freeProjects} apps, hosting on your own subdomain with HTTPS.`}
+          body={`Up to ${pricing.freeProjects} apps, hosting on your own subdomain with HTTPS. Stardoom AI charges nothing for AI: runs use your own Anthropic API key and are billed by Anthropic at their prices.`}
           aside={<span className="font-orbitron font-bold" style={{ fontSize: "var(--body)" }}>$0</span>}
         />
       </ul>
       <div className="mt-6">
-        <Subtitle>Credits · paid in $AESTRODOM</Subtitle>
+        <Subtitle>Desktop app</Subtitle>
       </div>
-      <p className="leading-relaxed text-gray-600" style={{ fontSize: "var(--body)" }}>
-        Keep building past the free runs, and use the Aestrodom API from your own tools. Each AI run is charged at Claude&apos;s own token price plus {pricing.marginPercent}%, nothing hidden.
-      </p>
-      {pricing.creditsPerUsd > 0 ? (
-        <ul className="mt-2">
-          {pricing.options.map((usd) => (
-            <Row
-              key={usd}
-              title={`$${usd} top-up`}
-              aside={
-                <span className="whitespace-nowrap font-semibold tabular-nums" style={{ fontSize: "var(--body)" }}>
-                  {(usd * pricing.creditsPerUsd).toLocaleString("en-US")} credits
-                </span>
-              }
-            />
-          ))}
-          <li className="pt-3 text-gray-500" style={{ fontSize: "var(--micro)", letterSpacing: "0.12em" }}>
-            Any amount works. You pay the dollar value in $AESTRODOM at the live on-chain price
-            {pricing.tokenUsd ? ` (now 1 $AESTRODOM ≈ $${pricing.tokenUsd})` : ""}.
-          </li>
-        </ul>
-      ) : (
-        <p className="mt-3 uppercase text-gray-500" style={{ fontSize: "var(--micro)", letterSpacing: "0.18em" }}>
-          Top-ups open soon
-        </p>
-      )}
+      <ul>
+        <Row title="Windows & macOS" body="Build on your own machine with your Anthropic key or a local AI (Ollama, LM Studio, any OpenAI-compatible server). Publish to the web when you're ready." />
+      </ul>
       <div className="mt-6">
         <Subtitle>API access</Subtitle>
       </div>
       <ul>
-        <Row title="Personal API keys" body="Create apps, run Claude and deploy from scripts, bots and other tools with an aestro_sk_ key. API requests always spend credits." />
+        <Row title="Personal API keys" body="Create apps, run the AI and deploy from scripts, bots and other tools with a stardoom_sk_ key. Runs use the Anthropic key saved in your settings." />
       </ul>
       <Link
         href={signedIn ? target : `/login?callbackUrl=${encodeURIComponent(target)}`}
         className="mt-4 inline-flex items-center gap-2 rounded-md border border-black bg-black px-4 py-2.5 font-semibold uppercase text-white transition-colors hover:bg-white hover:text-black"
         style={{ fontSize: "var(--body)", letterSpacing: "0.18em" }}
       >
-        Get credits <ArrowUpRight className="size-[1.1em]" strokeWidth={1.5} />
+        Add your key <ArrowUpRight className="size-[1.1em]" strokeWidth={1.5} />
       </Link>
     </>
   );
@@ -638,7 +739,7 @@ function FaqPanel({ domain }: { domain: string }) {
     ["Do I need coding experience?", "Not at all. Describe what you want and Claude makes the change. You can peek at the code in a read-only view if you're curious."],
     ["What kind of apps can I make?", "Single-page apps built with React, TypeScript and Tailwind: landing pages, portfolios, dashboards, small games and interactive tools."],
     ["Where is my app hosted?", `Each deployment runs in its own container and is served at {your-project}.${domain} with automatic HTTPS.`],
-    ["Who controls the token launch?", "You do. Aestrodom prepares the transaction from the current Pons V2 configuration, and your own wallet signs it. We never touch keys or seed phrases."],
+    ["Who controls the token launch?", "You do. Stardoom AI prepares the transaction from the current Pons V2 configuration, and your own wallet signs it. We never touch keys or seed phrases."],
     ["Will a token change my website?", "No. They're linked but independent. Editing your site later never touches the token's on-chain data."],
   ];
   return (
@@ -719,32 +820,4 @@ function StartPanel({ signedIn }: { signedIn: boolean }) {
 /* Ornaments                                                           */
 /* ------------------------------------------------------------------ */
 
-function Checker() {
-  const squares = [];
-  for (let row = 0; row < 4; row++) {
-    for (let col = 0; col < 4; col++) {
-      // Alternate rows shift by half a square pair, which makes the checkerboard.
-      const x = col * 9 + (row % 2 ? 4.5 : 0) + 0.35;
-      squares.push(<rect key={`${row}-${col}`} x={x} y={row * 4.5 + 0.35} width="3.8" height="3.8" fill="currentColor" />);
-    }
-  }
-  return (
-    <svg aria-hidden viewBox="0 0 36 18" className="shrink-0 translate-y-[2px]" style={{ width: "var(--checker-w)", height: "var(--checker-h)" }}>
-      {squares}
-    </svg>
-  );
-}
 
-function Globe() {
-  return (
-    <svg aria-hidden viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.2" style={{ width: "var(--globe)", height: "var(--globe)" }}>
-      <circle cx="32" cy="32" r="28" />
-      <line x1="4" y1="32" x2="60" y2="32" />
-      <ellipse cx="32" cy="32" rx="28" ry="10" />
-      <ellipse cx="32" cy="32" rx="28" ry="20" />
-      <line x1="32" y1="4" x2="32" y2="60" />
-      <ellipse cx="32" cy="32" rx="10" ry="28" />
-      <ellipse cx="32" cy="32" rx="20" ry="28" />
-    </svg>
-  );
-}

@@ -4,6 +4,8 @@ import { currentUserOrRedirect } from "@/lib/session";
 import { Logo } from "@/components/brand";
 import { Card } from "@/components/ui/misc";
 import { timeAgo } from "@/lib/utils";
+import { siteToken } from "@/lib/site-settings";
+import { TokenSettings } from "@/components/admin/token-settings";
 
 export const metadata = { title: "Admin" };
 export const dynamic = "force-dynamic";
@@ -14,7 +16,7 @@ export default async function AdminPage() {
   if (user.role !== "ADMIN") notFound();
 
   const since = new Date(Date.now() - 24 * 3600 * 1000);
-  const [users, projects, live, launches, usage, recentUsers, recentLaunches, errors] = await Promise.all([
+  const [users, projects, live, launches, usage, recentUsers, recentLaunches, errors, token] = await Promise.all([
     prisma.user.count(),
     prisma.project.count(),
     prisma.deployment.count({ where: { kind: "PRODUCTION", status: "RUNNING" } }),
@@ -23,6 +25,7 @@ export default async function AdminPage() {
     prisma.user.findMany({ orderBy: { createdAt: "desc" }, take: 10, select: { id: true, email: true, walletAddress: true, privyId: true, role: true, plan: true, disabled: true, createdAt: true, _count: { select: { projects: true } } } }),
     prisma.ponsLaunch.findMany({ orderBy: { createdAt: "desc" }, take: 10, select: { id: true, symbol: true, status: true, tokenAddress: true, createdAt: true, project: { select: { slug: true } } } }),
     prisma.projectLog.findMany({ where: { level: "ERROR" }, orderBy: { createdAt: "desc" }, take: 10, select: { id: true, source: true, message: true, createdAt: true, projectId: true } }),
+    siteToken(),
   ]);
 
   const stats = [
@@ -48,6 +51,7 @@ export default async function AdminPage() {
             </Card>
           ))}
         </div>
+        <TokenSettings initial={token} />
         <Table title="Recent users" head={["User", "Role", "Plan", "Projects", "Status", "Joined"]} rows={recentUsers.map((u) => [u.email ?? u.walletAddress ?? u.privyId ?? "—", u.role, u.plan, String(u._count.projects), u.disabled ? "Disabled" : "Active", timeAgo(u.createdAt)])} />
         <Table title="Token launches" head={["Token", "Project", "Status", "Address", "When"]} rows={recentLaunches.map((l) => [`$${l.symbol}`, l.project.slug, l.status, l.tokenAddress ?? "—", timeAgo(l.createdAt)])} />
         <Table title="Recent errors" head={["Source", "Project", "Message", "When"]} rows={errors.map((e) => [e.source, e.projectId.slice(0, 10), e.message.slice(0, 120), timeAgo(e.createdAt)])} />

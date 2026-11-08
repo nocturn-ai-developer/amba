@@ -7,11 +7,11 @@ import { AuthProviders } from "@/components/auth/privy-provider";
 import { THEME_KEY } from "@/lib/theme";
 import "./globals.css";
 
-const SITE_URL = process.env.NEXTAUTH_URL || "https://aestrodom.org";
-const SITE_TITLE = "Aestrodom — Build anything with AI";
-const SITE_DESCRIPTION = "Describe it. Claude builds it, Aestrodom deploys it live, and you launch its token on Pons V2 · Robinhood Chain in one click.";
+const SITE_URL = process.env.NEXTAUTH_URL || "https://stardoom.org";
+const SITE_TITLE = "Stardoom AI — Build anything with AI";
+const SITE_DESCRIPTION = "Describe it. Claude builds it, Stardoom AI deploys it live, and you launch its token on Pons V2 · Robinhood Chain in one click.";
 // Link preview card for X, Telegram, Discord, etc. (public/og.png, 1200×630).
-const OG_IMAGE = { url: "/og.png?v=2", width: 1200, height: 630, alt: "Aestrodom — Build anything with AI. Prompt → code → deploy → $token." };
+const OG_IMAGE = { url: "/og.png?v=2", width: 1200, height: 630, alt: "Stardoom AI — Build anything with AI. Prompt → code → deploy → $token." };
 
 // Orbitron for headlines, Plus Jakarta Sans for everything else (see --font-display / --font-sans).
 const orbitron = Orbitron({ subsets: ["latin"], weight: ["600", "700", "800", "900"], variable: "--font-orbitron" });
@@ -19,10 +19,10 @@ const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: SITE_TITLE, template: "%s · Aestrodom" },
+  title: { default: SITE_TITLE, template: "%s · Stardoom AI" },
   description: SITE_DESCRIPTION,
-  openGraph: { type: "website", siteName: "Aestrodom", url: "/", title: SITE_TITLE, description: SITE_DESCRIPTION, images: [OG_IMAGE] },
-  twitter: { card: "summary_large_image", site: "@aestrodom_ai", creator: "@aestrodom_ai", title: SITE_TITLE, description: SITE_DESCRIPTION, images: [OG_IMAGE] },
+  openGraph: { type: "website", siteName: "Stardoom AI", url: "/", title: SITE_TITLE, description: SITE_DESCRIPTION, images: [OG_IMAGE] },
+  twitter: { card: "summary_large_image", site: "@stardoom_ai", creator: "@stardoom_ai", title: SITE_TITLE, description: SITE_DESCRIPTION, images: [OG_IMAGE] },
   icons: { icon: [{ url: "/favicon.ico", sizes: "any" }, { url: "/icon.png", type: "image/png", sizes: "512x512" }], apple: "/apple-icon.png" },
 };
 

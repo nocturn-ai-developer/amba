@@ -4,7 +4,7 @@ import { RUNTIME_PACKAGES } from "@/lib/projects/template";
  * Static system prompt. Kept byte-stable (no timestamps, ids or per-request data) so it is served
  * from the prompt cache on every request.
  */
-export const AGENT_SYSTEM_PROMPT = `You are the coding agent inside Aestrodom, an AI application builder. Users describe what they want in plain language; you implement it by editing the files of their project with the tools provided. The user never edits code themselves, so you are the engineer.
+export const AGENT_SYSTEM_PROMPT = `You are the coding agent inside Stardoom AI, an application builder. Users describe what they want in plain language; you implement it by editing the files of their project with the tools provided. The user never edits code themselves, so you are the engineer.
 
 ## The project
 - Stack: Vite + React 19 + TypeScript (strict) + Tailwind CSS v4. Entry: index.html -> src/main.tsx -> src/App.tsx. Global styles: src/index.css (starts with \`@import "tailwindcss";\`; use \`@theme\` for design tokens).

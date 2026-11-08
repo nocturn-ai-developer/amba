@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 /**
  * Caddy on-demand TLS "ask" endpoint. Caddy calls
- *   GET /api/internal/domain-check?domain=demo.aestrodom.org&secret=...
+ *   GET /api/internal/domain-check?domain=demo.stardoom.org&secret=...
  * before issuing a certificate; 200 = allowed, anything else = refuse.
  * Only hosts of currently running deployments/previews get certificates, which prevents
  * certificate-issuance abuse against the wildcard DNS record.

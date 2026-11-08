@@ -5,6 +5,7 @@ import { addLog } from "@/lib/projects/logs";
 import { ensureWorkingCopy } from "@/lib/projects/filesystem";
 import { log, errorMessage } from "@/lib/logger";
 import { ensureContainer, exec, syncFiles, RuntimeUnavailableError, type ContainerKind } from "./docker";
+import { LocalRuntimeError, ensureServer, runLocalBuild } from "./local";
 
 export interface BuildResult {
   ok: boolean;
@@ -59,11 +60,21 @@ export async function buildProject(projectId: string, slug: string, kind: Contai
     const source = kind === "production" ? "DEPLOY" : "BUILD";
     try {
       await ensureWorkingCopy(projectId);
-      await addLog(projectId, source, "INFO", "Preparing sandbox");
-      const { container, info } = await ensureContainer(projectId, slug, kind);
-      await syncFiles(container, projectId);
-      await addLog(projectId, source, "INFO", "Building application");
-      const res = await exec(container, ["node", "/opt/prismatic/build.mjs"], env.buildTimeoutSeconds);
+      let res: { exitCode: number; stdout: string; stderr: string };
+      let hostPort: number | null;
+      if (env.appMode === "desktop") {
+        // No Docker on the user's machine: build with the bundled toolchain and serve on a local port.
+        await addLog(projectId, source, "INFO", "Building application");
+        res = await runLocalBuild(projectId, kind, env.buildTimeoutSeconds);
+        hostPort = await ensureServer(projectId, kind);
+      } else {
+        await addLog(projectId, source, "INFO", "Preparing sandbox");
+        const { container, info } = await ensureContainer(projectId, slug, kind);
+        await syncFiles(container, projectId);
+        await addLog(projectId, source, "INFO", "Building application");
+        res = await exec(container, ["node", "/opt/prismatic/build.mjs"], env.buildTimeoutSeconds);
+        hostPort = info.hostPort;
+      }
       const parsed = parseBuildOutput(res.stdout);
       const ok = res.exitCode === 0 && parsed.done;
       const durationMs = Date.now() - started;
@@ -78,9 +89,9 @@ export async function buildProject(projectId: string, slug: string, kind: Contai
       }
       await prisma.project.update({ where: { id: projectId }, data: { lastBuildOk: ok } });
       log.info("build.finished", { projectId, kind, ok, durationMs });
-      return { ok, errors, durationMs, hostPort: info.hostPort };
+      return { ok, errors, durationMs, hostPort };
     } catch (err) {
-      const infra = err instanceof RuntimeUnavailableError;
+      const infra = err instanceof RuntimeUnavailableError || err instanceof LocalRuntimeError;
       const message = infra ? (err as Error).message : "The build sandbox failed unexpectedly.";
       log.error("build.error", { projectId, kind, error: errorMessage(err) });
       await addLog(projectId, source, "ERROR", message);

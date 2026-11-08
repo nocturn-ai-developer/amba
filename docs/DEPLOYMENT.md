@@ -1,4 +1,4 @@
-# Deploying Aestrodom
+# Deploying Stardoom
 
 This guide takes a fresh Linux server to a running `prismatic.com` with automatic HTTPS for the
 main app, every deployed project (`{slug}.prismatic.com`) and every live preview
@@ -10,13 +10,13 @@ Internet
 Cloudflare / DNS          (A  prismatic.com, *.prismatic.com, *.preview.prismatic.com → SERVER_IP)
    ↓
 Caddy                     (TLS, host-based routing)
-   ├── prismatic.com ───────────────► Aestrodom App (Next.js) ──► PostgreSQL, Redis
+   ├── prismatic.com ───────────────► Stardoom App (Next.js) ──► PostgreSQL, Redis
    ├── {slug}.prismatic.com ────────► site-{slug}     ┐
    └── {slug}.preview.prismatic.com ► preview-{slug}  ┘ Project containers (internal network, no egress)
                                                         ▲
-                       Aestrodom App ── Docker API (socket proxy, restricted) ──┘
+                       Stardoom App ── Docker API (socket proxy, restricted) ──┘
 
-Aestrodom backend ──► Claude API            Browser wallet ──► Robinhood Chain (4663) ──► Pons V2
+Stardoom backend ──► Claude API            Browser wallet ──► Robinhood Chain (4663) ──► Pons V2
 ```
 
 All projects share one host and one proxy. Each project runs in its own container; no project gets

@@ -6,6 +6,8 @@ vi.mock("@/lib/pons/server", () => ({ publicClient: () => chain }));
 vi.mock("@/lib/db", () => ({ prisma: {} }));
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("next/headers", () => ({ headers: vi.fn() }));
+const site = vi.hoisted(() => ({ address: "0x1111111111111111111111111111111111111111" as string | null }));
+vi.mock("@/lib/site-settings", () => ({ siteTokenAddress: vi.fn(async () => site.address) }));
 // 1 token = $0.00002 → $1 = 50,000 tokens.
 vi.mock("@/lib/billing/price", async (orig) => {
   const real = await orig<typeof import("@/lib/billing/price")>();
@@ -20,13 +22,20 @@ describe("vote eligibility", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();
+    site.address = "0x1111111111111111111111111111111111111111";
+  });
+
+  it("stays closed until an admin sets the $STARDOOM address", async () => {
+    site.address = null;
+    await expect(assertCanVote(WALLET)).rejects.toMatchObject({ code: "token_not_launched" });
+    expect(chain.readContract).not.toHaveBeenCalled();
   });
 
   it("needs a linked wallet", async () => {
     await expect(assertCanVote(null)).rejects.toMatchObject({ code: "wallet_required" });
   });
 
-  it("needs $1 of $AESTRODOM at the live price", async () => {
+  it("needs $1 of $STARDOOM at the live price", async () => {
     chain.readContract.mockResolvedValue(parseUnits("49999", 18));
     await expect(assertCanVote(WALLET)).rejects.toMatchObject({ code: "hold_required" });
     chain.readContract.mockResolvedValue(parseUnits("50000", 18));

@@ -3,7 +3,7 @@
  * Callers must never pass secrets on purpose; redaction is a second line of defence.
  */
 const SECRET_KEY = /pass(word)?|secret|api[-_]?key|authorization|cookie|private[-_]?key|mnemonic|seed|database[-_]?url|^token$|access[-_]?token|session/i;
-const SECRET_VALUES: RegExp[] = [/sk-ant-[A-Za-z0-9_-]{10,}/g, /postgres(ql)?:\/\/[^\s"']+/g, /redis(s)?:\/\/[^\s"']+/g];
+const SECRET_VALUES: RegExp[] = [/sk-ant-[A-Za-z0-9_-]{10,}/g, /(?:stardoom|aestro)_sk_[A-Za-z0-9]{10,}/g, /v1\.[A-Za-z0-9+\/=]{40,}/g, /postgres(ql)?:\/\/[^\s"']+/g, /redis(s)?:\/\/[^\s"']+/g];
 
 export function redact(value: unknown, depth = 0): unknown {
   if (depth > 6) return "[depth]";

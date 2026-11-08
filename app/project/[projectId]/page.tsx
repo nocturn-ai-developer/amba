@@ -4,6 +4,8 @@ import { currentUserOrRedirect } from "@/lib/session";
 import { getProjectDomain } from "@/lib/deployment/domain";
 import { Builder } from "@/components/builder/builder";
 import { normalizeSkills } from "@/lib/skills";
+import { aiStatus, getSettings, publishCredentials } from "@/lib/ai/settings";
+import { env } from "@/lib/env";
 import type { ChatMessage } from "@/components/builder/types";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +23,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   const project = await prisma.project.findFirst({ where: { id: projectId, userId: user.id } });
   if (!project) notFound();
 
-  const [messages, liveDeployment, lastFileChange] = await Promise.all([
+  const [messages, liveDeployment, lastFileChange, ai, settings] = await Promise.all([
     prisma.message.findMany({
       where: { conversation: { projectId: project.id }, role: { in: ["USER", "ASSISTANT"] } },
       orderBy: { createdAt: "asc" },
@@ -33,6 +35,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       select: { createdAt: true },
     }),
     prisma.projectFile.aggregate({ where: { projectId: project.id }, _max: { updatedAt: true } }),
+    aiStatus(user.id),
+    getSettings(user.id),
   ]);
   // Files edited after the live build started mean the live site shows an older version.
   const lastEdit = lastFileChange._max.updatedAt;
@@ -73,6 +77,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       deployed={!!liveDeployment}
       outdated={outdated}
       userInitial={(user.name || user.email || "P").charAt(0).toUpperCase()}
+      ai={ai}
+      mode={env.appMode}
+      remote={project.remoteUrl && project.remoteId ? { url: project.remoteUrl, webUrl: `${publishCredentials(settings).url}/project/${project.remoteId}` } : null}
     />
   );
 }

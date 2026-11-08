@@ -6,7 +6,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
-/** Ends both the Privy session and the Aestrodom session. */
+/** Ends both the Privy session and the Stardoom AI session. */
 function useLogout() {
   const { logout } = usePrivy();
   const [busy, setBusy] = useState(false);

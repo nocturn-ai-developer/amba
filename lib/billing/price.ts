@@ -1,7 +1,7 @@
 import "server-only";
 import { getAddress, parseAbi, type Address } from "viem";
 import { ApiError } from "@/lib/api";
-import { env } from "@/lib/env";
+import { siteTokenAddress } from "@/lib/site-settings";
 import { log, errorMessage } from "@/lib/logger";
 import { publicClient } from "@/lib/pons/server";
 import { ponsDeployment } from "@/lib/pons/config";
@@ -30,14 +30,15 @@ export interface TokenPrice {
   ethUsdMicro: bigint;
   /** USD per whole token, for display. */
   tokenUsd: number;
+  /** The token this price is for; a new admin address invalidates the cache. */
+  token: string;
   at: number;
 }
 
 let curveCache: { token: string; curve: Address } | null = null;
 let priceCache: TokenPrice | null = null;
 
-async function curveAddress(): Promise<Address> {
-  const token = getAddress(env.creditsToken);
+async function curveAddress(token: Address): Promise<Address> {
   if (curveCache?.token === token) return curveCache.curve;
   const launched = await readLaunchedToken(publicClient(), ponsDeployment().factory, token);
   if (!launched.exists) throw new Error("credit token is not a Pons V2 launch");
@@ -65,9 +66,12 @@ async function ethUsd(): Promise<number> {
 }
 
 export async function tokenPrice(): Promise<TokenPrice> {
-  if (priceCache && Date.now() - priceCache.at < PRICE_TTL_MS) return priceCache;
+  const address = await siteTokenAddress();
+  if (!address) throw new ApiError(503, "$STARDOOM is not live yet.", "token_not_launched");
+  const token = getAddress(address);
+  if (priceCache && priceCache.token === token && Date.now() - priceCache.at < PRICE_TTL_MS) return priceCache;
   try {
-    const curve = await curveAddress();
+    const curve = await curveAddress(token);
     const client = publicClient();
     const [graduated, quoteReserve, tokenReserve, eth] = await Promise.all([
       client.readContract({ address: curve, abi: CURVE_ABI, functionName: "graduated" }),
@@ -80,34 +84,15 @@ export async function tokenPrice(): Promise<TokenPrice> {
     if (quoteReserve <= 0n || tokenReserve <= 0n) throw new Error("empty curve reserves");
     const ethUsdMicro = BigInt(Math.round(eth * 1e6));
     const tokenUsd = (Number(quoteReserve) / Number(tokenReserve)) * eth;
-    priceCache = { quoteReserve, tokenReserve, ethUsdMicro, tokenUsd, at: Date.now() };
+    priceCache = { quoteReserve, tokenReserve, ethUsdMicro, tokenUsd, token, at: Date.now() };
     return priceCache;
   } catch (err) {
     log.warn("billing.price.error", { error: errorMessage(err) });
-    throw new ApiError(503, "Live $AESTRODOM price is unavailable right now. Try again in a minute.", "price_unavailable");
+    throw new ApiError(503, "Live $STARDOOM price is unavailable right now. Try again in a minute.", "price_unavailable");
   }
 }
 
 /** Token amount (wei) worth `usdCents` at `p`: usd × tokenReserve / (ethUsd × quoteReserve). */
 export function tokensForUsd(usdCents: number, p: Pick<TokenPrice, "quoteReserve" | "tokenReserve" | "ethUsdMicro">) {
   return (BigInt(usdCents) * p.tokenReserve * 10n ** 22n) / (p.ethUsdMicro * p.quoteReserve);
-}
-
-export function creditsForUsd(usdCents: number) {
-  return Math.floor((usdCents * env.creditsPerUsd) / 100);
-}
-
-/** Validates a top-up amount in dollars and returns it in cents. */
-export function topupCents(usd: number) {
-  if (!Number.isFinite(usd)) throw new ApiError(400, "Enter an amount in USD.");
-  const cents = Math.round(usd * 100);
-  if (cents < Math.round(env.topupMinUsd * 100)) throw new ApiError(400, `The minimum top-up is $${env.topupMinUsd}.`);
-  if (cents > Math.round(env.topupMaxUsd * 100)) throw new ApiError(400, `The maximum top-up is $${env.topupMaxUsd}.`);
-  return cents;
-}
-
-export async function quoteTopup(usd: number) {
-  const usdCents = topupCents(usd);
-  const p = await tokenPrice();
-  return { usdCents, credits: creditsForUsd(usdCents), amount: tokensForUsd(usdCents, p), tokenUsd: p.tokenUsd };
 }

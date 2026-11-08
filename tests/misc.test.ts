@@ -66,7 +66,7 @@ describe("plans", () => {
   it("reads limits from env with sane defaults", () => {
     process.env.MAX_PROJECTS_PER_USER = "7";
     expect(planLimits("FREE").maxProjects).toBe(7);
-    expect(planLimits("FREE").maxAiRequestsPerDay).toBe(20);
+    expect(planLimits("FREE").maxProjectSizeBytes).toBe(100 * 1024 * 1024);
     expect(planLimits("PRO").maxProjects).toBe(50);
     delete process.env.MAX_PROJECTS_PER_USER;
   });

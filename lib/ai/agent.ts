@@ -1,11 +1,4 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
-import type {
-  BetaMessageParam,
-  BetaTextBlockParam,
-  BetaToolResultBlockParam,
-  BetaToolUseBlock,
-} from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import type { Project } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
@@ -16,14 +9,14 @@ import * as fsx from "@/lib/projects/filesystem";
 import { addLog } from "@/lib/projects/logs";
 import { refreshPreview } from "@/lib/runtime/preview";
 import { getProjectDomain } from "@/lib/deployment/domain";
-import { ClaudeRefusalError, ClaudeUnavailableError, streamTurn, textOf, usageOf } from "./claude";
 import { AGENT_SYSTEM_PROMPT, SUMMARY_SYSTEM_PROMPT } from "./prompts";
 import { RECENT_MESSAGES, renderContext, selectRelevantFiles } from "./context";
 import { TOOL_DEFINITIONS, executeTool, type FileOperation } from "./tools";
-import { recordUsage, type AiBilling } from "./usage";
-import { chargeRun } from "@/lib/billing/credits";
+import { recordUsage } from "./usage";
 import { normalizeSkills } from "@/lib/skills";
 import { skillPrompts } from "./skill-prompts";
+import type { ResolvedAi } from "./settings";
+import { AiProviderError, type ChatMessage, type ToolResult, type TurnResult, type Usage } from "./providers/types";
 
 export type AgentEvent =
   | { type: "status"; message: string }
@@ -34,10 +27,9 @@ export type AgentEvent =
   | { type: "done"; messageId: string; summary: string; operations: FileOperation[]; buildOk: boolean | null }
   | { type: "error"; message: string };
 
-/** The base prompt plus the project's enabled skills; the cache breakpoint sits on the last block. */
-export function systemFor(skills: readonly string[]): BetaTextBlockParam[] {
-  const texts = [AGENT_SYSTEM_PROMPT, ...skillPrompts(normalizeSkills(skills))];
-  return texts.map((text, i) => (i === texts.length - 1 ? { type: "text", text, cache_control: { type: "ephemeral" } } : { type: "text", text }));
+/** The base prompt plus the project's enabled skills (Anthropic puts its cache breakpoint on the last block). */
+export function systemFor(skills: readonly string[]): string[] {
+  return [AGENT_SYSTEM_PROMPT, ...skillPrompts(normalizeSkills(skills))];
 }
 
 // One agent run per project at a time (per app instance).
@@ -46,15 +38,10 @@ export function isAgentRunning(projectId: string) {
   return running.has(projectId);
 }
 
-interface Totals {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-}
+type Totals = Usage;
 
-/** Folds older messages into the rolling summary. Returns the Claude usage it caused, if any. */
-async function maybeSummarize(conversationId: string, userId: string, projectId: string): Promise<Totals | null> {
+/** Folds older messages into the rolling summary. Returns the usage it caused, if any. */
+async function maybeSummarize(ai: ResolvedAi, conversationId: string, userId: string, projectId: string): Promise<Totals | null> {
   const convo = await prisma.conversation.findUnique({ where: { id: conversationId } });
   if (!convo) return null;
   const pending = await prisma.message.findMany({
@@ -67,26 +54,23 @@ async function maybeSummarize(conversationId: string, userId: string, projectId:
   const transcript = toFold.map((m) => `${m.role}: ${m.content.slice(0, 2000)}`).join("\n\n");
   const started = Date.now();
   try {
-    const msg = await streamTurn(
-      {
-        system: [{ type: "text", text: SUMMARY_SYSTEM_PROMPT }],
-        messages: [
-          {
-            role: "user",
-            content: `<previous_summary>\n${convo.summary}\n</previous_summary>\n<conversation>\n${transcript}\n</conversation>`,
-          },
-        ],
-        maxTokens: 2000,
-        effort: "low",
-      },
-      {},
-    );
-    const u = usageOf(msg);
+    const msg = await ai.provider.turn({
+      system: [SUMMARY_SYSTEM_PROMPT],
+      messages: [
+        {
+          role: "user",
+          content: `<previous_summary>\n${convo.summary}\n</previous_summary>\n<conversation>\n${transcript}\n</conversation>`,
+        },
+      ],
+      maxTokens: 2000,
+      effort: "low",
+    });
+    const u = msg.usage;
     await prisma.conversation.update({
       where: { id: conversationId },
-      data: { summary: textOf(msg).slice(0, 4000), summarizedUntil: toFold[toFold.length - 1].createdAt },
+      data: { summary: msg.text.slice(0, 4000), summarizedUntil: toFold[toFold.length - 1].createdAt },
     });
-    await recordUsage({ userId, projectId, kind: "ai.summarize", model: env.anthropicModel, ...u, durationMs: Date.now() - started, success: true });
+    await recordUsage({ userId, projectId, kind: "ai.summarize", model: ai.provider.model, ...u, durationMs: Date.now() - started, success: true });
     return u;
   } catch (err) {
     log.warn("ai.summarize.failed", { projectId, error: errorMessage(err) });
@@ -109,20 +93,18 @@ export interface RunAgentInput {
   project: Project;
   prompt: string;
   emit: (e: AgentEvent) => void;
-  /** "credits" charges the run to the user's prepaid balance once it finishes. */
-  billing?: AiBilling;
+  /** The user's own AI provider (their Anthropic key, or a local model in the desktop app). */
+  ai: ResolvedAi;
 }
 
-export async function runAgent({ user, project, prompt, emit, billing = "plan" }: RunAgentInput): Promise<void> {
+export async function runAgent({ user, project, prompt, emit, ai }: RunAgentInput): Promise<void> {
   if (running.has(project.id)) {
-    emit({ type: "error", message: "Claude is already working on this project." });
+    emit({ type: "error", message: "The AI is already working on this project." });
     return;
   }
   running.add(project.id);
   const started = Date.now();
   const totals: Totals = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
-  // Claude usage outside the agent turns (the rolling summary); billed with the run.
-  let summaryUsage: Totals | null = null;
   const operations: FileOperation[] = [];
   const activity: string[] = [];
   let finalText = "";
@@ -138,10 +120,10 @@ export async function runAgent({ user, project, prompt, emit, billing = "plan" }
   try {
     await prisma.message.create({ data: { conversationId: conversation.id, role: "USER", content: prompt } });
     await prisma.project.update({ where: { id: project.id }, data: { status: "BUILDING" } });
-    await addLog(project.id, "AI", "INFO", "Claude is working on your request");
+    await addLog(project.id, "AI", "INFO", `Working on your request (${ai.provider.model})`);
     emit({ type: "status", message: "Reading your project" });
 
-    summaryUsage = await maybeSummarize(conversation.id, user.id, project.id);
+    await maybeSummarize(ai, conversation.id, user.id, project.id);
     await fsx.ensureWorkingCopy(project.id);
 
     // ---- Context ----
@@ -158,7 +140,11 @@ export async function runAgent({ user, project, prompt, emit, billing = "plan" }
       .map((m) => ({ role: m.role, content: m.content }));
     const files = await fsx.listFiles(project.id);
     const contents = await loadForScoring(project.id, files);
-    const relevantPaths = selectRelevantFiles(files, prompt, (p) => contents.get(p), { isNewProject: isFirstRun });
+    const relevantPaths = selectRelevantFiles(files, prompt, (p) => contents.get(p), {
+      isNewProject: isFirstRun,
+      budgetChars: ai.limits.budgetChars,
+      maxFiles: ai.limits.maxFiles,
+    });
     const relevant = relevantPaths.map((p) => ({ path: p, content: contents.get(p) ?? "" }));
     const contextText = renderContext({
       project: {
@@ -176,7 +162,7 @@ export async function runAgent({ user, project, prompt, emit, billing = "plan" }
       request: prompt,
     });
 
-    const messages: BetaMessageParam[] = [{ role: "user", content: contextText }];
+    const messages: ChatMessage[] = [{ role: "user", content: contextText }];
     const system = systemFor(project.skills);
     const limits = planLimits(user.plan);
 
@@ -204,10 +190,10 @@ export async function runAgent({ user, project, prompt, emit, billing = "plan" }
 
     let jsonRetries = 0;
     for (let step = 0; step < env.aiMaxAgentSteps; step++) {
-      emit({ type: "status", message: step === 0 ? "Claude is thinking" : "Claude is working" });
-      let message;
+      emit({ type: "status", message: step === 0 ? "The AI is thinking" : "The AI is working" });
+      let message: TurnResult;
       try {
-        message = await streamTurn(
+        message = await ai.provider.turn(
           { system, messages, tools: TOOL_DEFINITIONS },
           {
             onText: (delta) => emit({ type: "text", delta }),
@@ -216,39 +202,26 @@ export async function runAgent({ user, project, prompt, emit, billing = "plan" }
         );
         jsonRetries = 0;
       } catch (err) {
-        // Eager tool-input streaming can surface unparseable JSON; retry the turn a couple of times.
-        if (
-          err instanceof Anthropic.APIError ||
-          err instanceof ClaudeRefusalError ||
-          err instanceof ClaudeUnavailableError ||
-          jsonRetries++ >= 2
-        )
-          throw err;
+        // Streaming can surface unparseable output; retry the turn a couple of times. Provider errors are final.
+        if (err instanceof AiProviderError || jsonRetries++ >= 2) throw err;
         log.warn("ai.turn.retry", { projectId: project.id, error: errorMessage(err) });
         continue;
       }
-      const u = usageOf(message);
-      totals.inputTokens += u.inputTokens;
-      totals.outputTokens += u.outputTokens;
-      totals.cacheReadTokens += u.cacheReadTokens;
-      totals.cacheWriteTokens += u.cacheWriteTokens;
-      const text = textOf(message);
-      if (text) finalText = text;
+      totals.inputTokens += message.usage.inputTokens;
+      totals.outputTokens += message.usage.outputTokens;
+      totals.cacheReadTokens += message.usage.cacheReadTokens;
+      totals.cacheWriteTokens += message.usage.cacheWriteTokens;
+      if (message.text) finalText = message.text;
 
-      if (message.stop_reason === "pause_turn") {
-        messages.push({ role: "assistant", content: message.content });
-        continue;
-      }
+      messages.push({ role: "assistant", text: message.text, toolCalls: message.toolCalls, native: message.native });
+      if (message.stop === "pause") continue;
 
-      const toolUses = message.content.filter((b): b is BetaToolUseBlock => b.type === "tool_use");
-      messages.push({ role: "assistant", content: message.content });
-
-      if (toolUses.length > 0) {
-        const results: BetaToolResultBlockParam[] = [];
-        for (const tu of toolUses) {
-          if (message.stop_reason === "max_tokens") {
+      if (message.toolCalls.length > 0) {
+        const results: ToolResult[] = [];
+        for (const tu of message.toolCalls) {
+          if (message.stop === "max_tokens") {
             // A tool input cut off at max_tokens may parse as a valid but truncated object: never apply it.
-            results.push({ type: "tool_result", tool_use_id: tu.id, is_error: true, content: "Output was truncated before this call finished. Split the change into smaller files or use edit_file." });
+            results.push({ id: tu.id, name: tu.name, isError: true, content: "Output was truncated before this call finished. Split the change into smaller files or use edit_file." });
             emit({ type: "tool", id: tu.id, name: tu.name, status: "error", label: "Output truncated" });
             continue;
           }
@@ -263,19 +236,19 @@ export async function runAgent({ user, project, prompt, emit, billing = "plan" }
           }
           activity.push(outcome.label);
           emit({ type: "tool", id: tu.id, name: tu.name, status: outcome.isError ? "error" : "done", label: outcome.label });
-          results.push({ type: "tool_result", tool_use_id: tu.id, content: outcome.content, is_error: outcome.isError || undefined });
+          results.push({ id: tu.id, name: tu.name, content: outcome.content, isError: outcome.isError || undefined });
         }
-        messages.push({ role: "user", content: results });
+        messages.push({ role: "tool", results });
         continue;
       }
 
-      // Claude finished. Verify the build unless the last thing it did was a passing build.
+      // The model finished. Verify the build unless the last thing it did was a passing build.
       if (dirtySinceBuild && !buildUnavailable) {
         const res = await runBuild();
         if (!res.ok) {
           if (repairAttempts < env.aiMaxRepairAttempts) {
             repairAttempts++;
-            emit({ type: "status", message: `Your application failed to build. Claude is attempting to fix it (${repairAttempts}/${env.aiMaxRepairAttempts}).` });
+            emit({ type: "status", message: `Your application failed to build. The AI is attempting to fix it (${repairAttempts}/${env.aiMaxRepairAttempts}).` });
             await addLog(project.id, "AI", "WARN", `Automatic repair attempt ${repairAttempts}`);
             messages.push({
               role: "user",
@@ -301,17 +274,15 @@ export async function runAgent({ user, project, prompt, emit, billing = "plan" }
       },
     });
     await fsx.syncSize(project.id);
-    await addLog(project.id, "AI", "SUCCESS", `Claude finished: ${operations.length} file operation(s)`);
+    await addLog(project.id, "AI", "SUCCESS", `AI finished: ${operations.length} file operation(s)`);
     emit({ type: "done", messageId: saved.id, summary, operations, buildOk });
   } catch (err) {
     const userMessage =
       err instanceof BuildFailedError
         ? "Your application failed to build after 3 automatic repair attempts. The preview still shows the last working version — try describing the change differently."
-        : err instanceof ClaudeUnavailableError
-          ? "Claude is not configured on this server."
-          : err instanceof Anthropic.RateLimitError
-            ? "Claude is busy right now. Please try again in a moment."
-            : "Claude could not complete this change.";
+        : err instanceof AiProviderError
+          ? err.message
+          : "The AI could not complete this change.";
     log.error("ai.run.failed", { userId: user.id, projectId: project.id, error: errorMessage(err) });
     await addLog(project.id, "AI", "ERROR", userMessage);
     await prisma.message
@@ -328,29 +299,17 @@ export async function runAgent({ user, project, prompt, emit, billing = "plan" }
   } finally {
     running.delete(project.id);
     const durationMs = Date.now() - started;
-    // Only runs that actually reached Claude count against the user's daily quota.
+    // Record token usage for runs that reached the model (shown to the user; no billing).
     if (totals.inputTokens + totals.outputTokens > 0) {
       await recordUsage({
         userId: user.id,
         projectId: project.id,
         kind: "ai.generate",
-        model: env.anthropicModel,
+        model: ai.provider.model,
         ...totals,
         durationMs,
         success,
       }).catch(() => undefined);
-    }
-    if (billing === "credits") {
-      const s = summaryUsage;
-      const billed: Totals = s
-        ? {
-            inputTokens: totals.inputTokens + s.inputTokens,
-            outputTokens: totals.outputTokens + s.outputTokens,
-            cacheReadTokens: totals.cacheReadTokens + s.cacheReadTokens,
-            cacheWriteTokens: totals.cacheWriteTokens + s.cacheWriteTokens,
-          }
-        : totals;
-      if (billed.inputTokens + billed.outputTokens > 0) await chargeRun(user.id, project.id, billed);
     }
     const live = await prisma.deployment.count({ where: { projectId: project.id, kind: "PRODUCTION", status: "RUNNING" } });
     const status = live > 0 ? "DEPLOYED" : success || !isFirstRun ? "READY" : "ERROR";

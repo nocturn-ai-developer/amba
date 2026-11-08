@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireUser, route } from "@/lib/api";
-import { creditBalance } from "@/lib/billing/credits";
+import { getSettings } from "@/lib/ai/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Who the session or API key belongs to, and the credit balance. Handy for checking a key works. */
+/** Who the session or API key belongs to, and whether an AI key is set up. Handy for checking a key works. */
 export const GET = route(async () => {
   const user = await requireUser();
   return NextResponse.json({
@@ -13,7 +13,7 @@ export const GET = route(async () => {
     email: user.email,
     name: user.name,
     plan: user.plan,
-    credits: await creditBalance(user.id),
+    aiConfigured: !!(await getSettings(user.id))?.anthropicKeyEnc,
     auth: user.apiKeyId ? "api_key" : "session",
   });
 });

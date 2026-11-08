@@ -1,8 +1,8 @@
-# Aestrodom
+# Stardoom AI
 
-**Build anything with AI.** Describe your idea. Claude writes the code. Aestrodom deploys it.
+**Build anything with AI.** Describe your idea. Claude writes the code. Stardoom AI deploys it.
 
-Aestrodom is an AI application builder: a user describes an app, a Claude coding agent builds it,
+Stardoom AI is an AI application builder: a user describes an app, a Claude coding agent builds it,
 the user watches a live preview, iterates in plain language, deploys it to `{slug}.prismatic.com`,
 and can launch a token for the project through **Pons V2 on Robinhood Chain**.
 
@@ -10,6 +10,11 @@ and can launch a token for the project through **Pons V2 on Robinhood Chain**.
 Describe → Claude edits files → sandboxed build → live preview → iterate
         → Deploy → arrow.prismatic.com → Launch Token → wallet signs → $ARROW
 ```
+
+Stardoom AI runs in two ways:
+
+- **Web** (stardoom.org): sign in with Privy, **bring your own Anthropic API key** (Settings → AI provider). Stardoom AI never charges for AI; runs are billed by Anthropic to the user's own key.
+- **Desktop app** (Windows .exe, macOS .dmg): no login, no Docker. Choose Claude with your own key or a **local AI** (Ollama, LM Studio, or any OpenAI-compatible endpoint). Projects build and preview on your machine; **Export** downloads a zip, **Publish** deploys to your stardoom.org account (token launches happen there).
 
 ## Features
 
@@ -82,11 +87,12 @@ See [`.env.example`](.env.example) for the full annotated list. Key ones:
 | Variable | Notes |
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string |
-| `ANTHROPIC_API_KEY` | Server-only. `ANTHROPIC_MODEL` (default `claude-opus-5-5`), `ANTHROPIC_EFFORT` (default `high`) |
+| `SECRET_ENCRYPTION_KEY` | 32 random bytes (base64) that encrypt users' saved API keys (AES-256-GCM). Required to save keys. |
+| `ANTHROPIC_MODEL`, `ANTHROPIC_EFFORT` | Model/effort used with each user's own key (defaults `claude-opus-5-5`, `high`). The server has no Anthropic key of its own. |
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Privy app id (public). Add your origins under *Allowed origins* in the Privy dashboard |
 | `AUTH_SECRET`, `NEXTAUTH_URL` | Auth.js session cookies, issued after the Privy token is verified |
 | `PRISMATIC_DOMAIN`, `PRISMATIC_PREVIEW_DOMAIN` | `prismatic.com`, `preview.prismatic.com` |
-| `MAX_AI_REQUESTS_PER_DAY`, `MAX_PROJECTS_PER_USER`, `MAX_PROJECT_SIZE_MB`, `PRO_*`, `MAX_AI_TOKENS_PER_DAY` | Plan limits |
+| `MAX_PROJECTS_PER_USER`, `MAX_PROJECT_SIZE_MB`, `PRO_*` | Plan limits (AI runs are not limited: users pay their own provider) |
 | `DEPLOYMENT_MODE` | `local` (loopback ports) or `production` (Caddy + internal network) |
 | `DOCKER_HOST`, `RUNTIME_IMAGE`, `CONTAINER_*`, `BUILD_TIMEOUT_SECONDS` | Sandbox |
 | `STORAGE_PATH` | Project working copies (default `./storage`) |
@@ -105,12 +111,24 @@ docker compose -f deploy/docker-compose.dev.yml up -d   # local Postgres + Redis
 npx prisma migrate dev
 ```
 
-## Claude setup
+## AI providers
 
-Set `ANTHROPIC_API_KEY`. The agent streams with adaptive thinking, `output_config.effort`,
-prompt caching on the static system prompt and tool definitions, eager tool-input streaming with
-schema validation, and server-side refusal fallbacks (`fallbacks: "default"`). Each request records
-input/output/cache tokens in `Usage`.
+| Where | Providers | Notes |
+|---|---|---|
+| Web | Claude (user's Anthropic key) | Keys are encrypted with `SECRET_ENCRYPTION_KEY`, tested against Anthropic before saving, never sent back to the browser. Local/custom endpoints are refused on the server (no SSRF). |
+| Desktop | Claude, Ollama, LM Studio, any OpenAI-compatible URL | `lib/ai/providers/openai-compatible.ts` streams Chat Completions with tool calls. Use a tool-calling model (qwen2.5-coder, qwen3, llama3.1…); local models get a smaller context budget. |
+
+The agent (`lib/ai/agent.ts`) talks to a provider-neutral interface (`lib/ai/providers/types.ts`). With Claude it streams with adaptive thinking, `output_config.effort`, prompt caching and server-side refusal fallbacks. Each run records its tokens in `Usage` (shown to the user; nothing is billed).
+
+## Desktop app
+
+```bash
+npm ci && (cd runtime && npm ci) && (cd desktop && npm ci)
+node desktop/build.mjs              # installer for this OS in desktop/dist
+node desktop/build.mjs --no-pack    # assemble only, then: cd desktop && npx electron .
+```
+
+`desktop/main.cjs` starts an embedded PostgreSQL (data in the OS user-data folder), applies `prisma/migrations`, runs the Next.js standalone server on `127.0.0.1` with `STARDOOM_MODE=desktop`, and guards it with a per-launch token cookie. Projects build with the bundled toolchain (`runtime/`) via `lib/runtime/local.ts` instead of Docker. macOS installers must be built on macOS: `.github/workflows/desktop.yml` builds Windows x64, macOS arm64 and macOS x64. Installers are unsigned for now (SmartScreen / Gatekeeper will warn).
 
 ## Docker setup
 
@@ -177,7 +195,9 @@ server-only secrets, non-custodial wallet flow with on-chain verification, rate 
 |---|---|
 | "The preview runtime is not available" | Start Docker; check `DOCKER_HOST`. |
 | "Runtime image … is missing" | `npm run runtime:build` |
-| "Claude is not configured on this server" | Set `ANTHROPIC_API_KEY` and restart. |
+| "Add your Anthropic API key in Settings to use AI." | The user has no key saved: Settings → AI provider. |
+| "Saving keys is not configured on this server." | Set `SECRET_ENCRYPTION_KEY` (32 bytes, base64) and restart. |
+| Desktop: "Could not reach http://127.0.0.1:11434/v1" | Start Ollama (or LM Studio's server) and pick a model in Settings. |
 | Build keeps failing after 3 repairs | Open **Console** for the compiler output; ask Claude to simplify the change. |
 | Certificates not issued for `{slug}.prismatic.com` | DNS wildcard must point at the server; `CADDY_ASK_SECRET` must match; the project must be deployed. |
 | "Could not read Pons V2 configuration" | RPC unreachable or rate-limited; set `ROBINHOOD_RPC_URL`. |

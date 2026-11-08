@@ -7,13 +7,13 @@
 # 	}
 # }
 
-aestrodom.org, www.aestrodom.org {
+stardoom.org, www.stardoom.org {
 	reverse_proxy 127.0.0.1:8480 {
 		flush_interval -1
 	}
 }
 
-*.aestrodom.org, *.preview.aestrodom.org {
+*.stardoom.org, *.preview.stardoom.org {
 	tls {
 		on_demand
 	}

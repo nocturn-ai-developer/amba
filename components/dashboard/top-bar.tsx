@@ -15,13 +15,16 @@ const NAV = [
   { href: "/dashboard/templates", label: "Templates" },
   { href: "/battleground", label: "Battleground" },
   { href: "/pass", label: "Pass" },
-  { href: "/dashboard/billing", label: "Credits" },
 ];
 
 /** Workspace header: wordmark, tracked caps nav (active link underlined in ink), a create button and the account menu. */
-export function TopBar({ email, name, isAdmin }: { email: string | null; name: string | null; isAdmin: boolean }) {
+/** Web-only sections (they need stardoom.org: public listing, on-chain pass). */
+const WEB_ONLY = new Set(["/battleground", "/pass"]);
+
+export function TopBar({ email, name, isAdmin, desktop = false }: { email: string | null; name: string | null; isAdmin: boolean; desktop?: boolean }) {
   const pathname = usePathname();
-  const items = isAdmin ? [...NAV, { href: "/admin", label: "Admin" }] : NAV;
+  const base = desktop ? [...NAV.filter((i) => !WEB_ONLY.has(i.href)), { href: "/dashboard/settings", label: "Settings" }] : NAV;
+  const items = isAdmin && !desktop ? [...base, { href: "/admin", label: "Admin" }] : base;
   const initial = (name || email || "A").charAt(0).toUpperCase();
   const isActive = (item: (typeof items)[number]) => ("exact" in item && item.exact ? pathname === item.href : pathname.startsWith(item.href));
 
@@ -58,18 +61,18 @@ export function TopBar({ email, name, isAdmin }: { email: string | null; name: s
               <DropdownMenu.Content align="end" sideOffset={8} className="panel z-50 w-64 rounded-md p-1.5 text-fg">
                 <div className="px-3 py-2.5">
                   {name && <div className="truncate text-[14px] font-semibold">{name}</div>}
-                  <div className="truncate text-[12px] text-subtle">{email ?? "Signed in with Privy"}</div>
+                  <div className="truncate text-[12px] text-subtle">{desktop ? "This computer" : (email ?? "Signed in with Privy")}</div>
                 </div>
                 <DropdownMenu.Separator className="my-1 h-px bg-border" />
                 <DropdownMenu.Item asChild>
                   <Link href="/dashboard/settings" className="flex items-center gap-2.5 rounded-[4px] px-3 py-2 text-[13px] text-muted outline-none data-[highlighted]:bg-elevated data-[highlighted]:text-fg">
-                    <Settings className="size-4" /> Account & usage
+                    <Settings className="size-4" /> {desktop ? "AI & publishing" : "Account & AI"}
                   </Link>
                 </DropdownMenu.Item>
                 <DropdownMenu.Separator className="my-1 h-px bg-border" />
                 <div className="flex items-center justify-between px-2 py-1">
                   <ThemeToggle className="size-8" />
-                  <LogoutIconButton />
+                  {!desktop && <LogoutIconButton />}
                 </div>
               </DropdownMenu.Content>
             </DropdownMenu.Portal>

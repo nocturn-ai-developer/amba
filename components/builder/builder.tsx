@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowUp, Code2, Coins, Eye, FolderTree, MessageSquare, PanelRightClose, PanelRightOpen, RefreshCw, Rocket, Settings, Terminal } from "lucide-react";
+import { ArrowUp, Code2, Coins, Download, ExternalLink, Eye, Globe, FolderTree, MessageSquare, PanelRightClose, PanelRightOpen, RefreshCw, Rocket, Settings, Terminal } from "lucide-react";
 import { toast } from "sonner";
 import { BrandMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,17 @@ import { TOOL_LABELS, type AgentEvent, type BuilderProject, type ChatMessage } f
 type View = "preview" | "code" | "console" | "token";
 type MobilePane = "chat" | "view" | "files";
 
-export function Builder(props: { project: BuilderProject; initialMessages: ChatMessage[]; deployed: boolean; outdated: boolean; userInitial: string }) {
+export interface BuilderEnv {
+  /** Whether the user's AI provider is set up, and what it is (or what is missing). */
+  ai: { ready: boolean; label: string };
+  mode: "web" | "desktop";
+  /** Desktop: where this project was published on the web (live site + its page on stardoom.org). */
+  remote: { url: string; webUrl: string } | null;
+}
+
+type BuilderProps = { project: BuilderProject; initialMessages: ChatMessage[]; deployed: boolean; outdated: boolean; userInitial: string } & BuilderEnv;
+
+export function Builder(props: BuilderProps) {
   return (
     <WalletProviders>
       <BuilderInner {...props} />
@@ -34,7 +44,8 @@ export function Builder(props: { project: BuilderProject; initialMessages: ChatM
   );
 }
 
-function BuilderInner({ project: initial, initialMessages, deployed: initiallyDeployed, outdated: initiallyOutdated, userInitial }: { project: BuilderProject; initialMessages: ChatMessage[]; deployed: boolean; outdated: boolean; userInitial: string }) {
+function BuilderInner({ project: initial, initialMessages, deployed: initiallyDeployed, outdated: initiallyOutdated, userInitial, ai, mode, remote }: BuilderProps) {
+  const desktop = mode === "desktop";
   const [project, setProject] = useState(initial);
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
@@ -56,6 +67,8 @@ function BuilderInner({ project: initial, initialMessages, deployed: initiallyDe
   const redeployRef = useRef<() => void>(() => undefined);
   const [startingPreview, setStartingPreview] = useState(false);
   const [tokenVersion, setTokenVersion] = useState(0);
+  const [published, setPublished] = useState(remote);
+  const [publishing, setPublishing] = useState(false);
   const started = useRef(false);
 
   const token = useTokenData(project.id, deployed, tokenVersion);
@@ -74,7 +87,7 @@ function BuilderInner({ project: initial, initialMessages, deployed: initiallyDe
       setMessages((ms) => [
         ...ms,
         { id: userId, role: "USER", content: displayPrompt },
-        { id: asstId, role: "ASSISTANT", content: "", activity: [], pending: true, status: "Claude is thinking" },
+        { id: asstId, role: "ASSISTANT", content: "", activity: [], pending: true, status: "The AI is thinking" },
       ]);
       setProject((p) => ({ ...p, status: "BUILDING" }));
       let text = "";
@@ -87,7 +100,7 @@ function BuilderInner({ project: initial, initialMessages, deployed: initiallyDe
         });
         if (!res.ok || !res.body) {
           const d = await res.json().catch(() => ({}));
-          throw new Error(d.error ?? "Claude could not complete this change.");
+          throw new Error(d.error ?? "The AI could not complete this change.");
         }
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -145,7 +158,7 @@ function BuilderInner({ project: initial, initialMessages, deployed: initiallyDe
           }
         }
       } catch (err) {
-        patchAssistant(asstId, (m) => ({ ...m, pending: false, error: true, content: err instanceof Error ? err.message : "Claude could not complete this change." }));
+        patchAssistant(asstId, (m) => ({ ...m, pending: false, error: true, content: err instanceof Error ? err.message : "The AI could not complete this change." }));
       } finally {
         patchAssistant(asstId, (m) => (m.pending ? { ...m, pending: false, content: m.content || text.trim() || "Done." } : m));
         setRunning(false);
@@ -170,15 +183,15 @@ function BuilderInner({ project: initial, initialMessages, deployed: initiallyDe
   // First visit after creation: start the initial generation automatically.
   useEffect(() => {
     if (started.current) return;
-    if (initial.status === "CREATING" && initialMessages.length === 0) {
+    if (ai.ready && initial.status === "CREATING" && initialMessages.length === 0) {
       started.current = true;
       run({ initial: true }, initial.description);
     }
-  }, [initial.status, initial.description, initialMessages.length, run]);
+  }, [ai.ready, initial.status, initial.description, initialMessages.length, run]);
 
   function send() {
     const prompt = input.trim();
-    if (!prompt || running) return;
+    if (!prompt || running || !ai.ready) return;
     setInput("");
     run({ prompt, skills }, prompt);
     setMobilePane("chat");
@@ -255,6 +268,28 @@ function BuilderInner({ project: initial, initialMessages, deployed: initiallyDe
   }
   redeployRef.current = redeploy;
 
+  /** Desktop: upload to the user's Stardoom AI account and deploy there. */
+  async function publish() {
+    if (publishing || running) return;
+    setPublishing(true);
+    const id = toast.loading("Publishing to the web…");
+    try {
+      const res = await fetch(`/api/projects/${project.id}/publish`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const data = await res.json().catch(() => ({}));
+      if (data.code === "publish_not_configured") {
+        toast.error("Connect your Stardoom AI account first.", { id, action: { label: "Settings", onClick: () => (window.location.href = "/dashboard/settings") } });
+        return;
+      }
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Publishing failed.");
+      setPublished({ url: data.url, webUrl: data.webUrl });
+      toast.success("Your app is live", { id, action: { label: "Open", onClick: () => window.open(data.url, "_blank", "noopener") } });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Publishing failed.", { id });
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   const statusTone = running ? "warning" : deployed ? "success" : project.status === "ERROR" ? "danger" : "neutral";
   const statusLabel = running ? "Building" : deployed ? "Published" : project.status === "ERROR" ? "Error" : "Draft";
 
@@ -279,7 +314,7 @@ function BuilderInner({ project: initial, initialMessages, deployed: initiallyDe
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-3">
         <Link href="/dashboard" className="flex items-center gap-2 pr-1" aria-label="Dashboard">
           <BrandMark />
-          <span className="hidden font-[family-name:var(--font-display)] text-[13px] font-black uppercase tracking-[0.15em] sm:inline">aestrodom</span>
+          <span className="hidden font-[family-name:var(--font-display)] text-[13px] font-black uppercase tracking-[0.15em] sm:inline">stardoom</span>
         </Link>
         <span className="text-border-strong">/</span>
         <div className="flex min-w-0 items-center gap-2">
@@ -293,22 +328,41 @@ function BuilderInner({ project: initial, initialMessages, deployed: initiallyDe
           {hasToken && <ViewButton active={view === "token"} onClick={() => setView("token")} icon={<Coins />} label={`$${token!.launch!.symbol}`} />}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {deployed && (
+          {desktop && (
+            <>
+              <Button size="sm" variant="secondary" asChild>
+                <a href={`/api/projects/${project.id}/export`} download title="Download the source and the built site as a zip">
+                  <Download /> <span className="hidden sm:inline">Export</span>
+                </a>
+              </Button>
+              {published && (
+                <Button size="sm" variant="ghost" onClick={() => window.open(published.webUrl, "_blank", "noopener")} title="Open on stardoom.org to launch a token">
+                  <ExternalLink /> <span className="hidden lg:inline">Open on web</span>
+                </Button>
+              )}
+              <Button size="sm" variant="accent" onClick={publish} loading={publishing} disabled={running || project.status === "CREATING"} title={published ? `Live at ${published.url}` : "Deploy to your own subdomain"}>
+                {!publishing && <Globe />} <span className="hidden sm:inline">{published ? "Republish" : "Publish"}</span>
+              </Button>
+            </>
+          )}
+          {!desktop && deployed && (
             <Button
               size="sm"
               variant={outdated ? "accent" : "secondary"}
               onClick={redeploy}
               loading={redeploying}
               disabled={running}
-              title={running ? "Wait for Claude to finish" : outdated ? "Publish your latest changes to the live site" : "Rebuild and restart the live site"}
+              title={running ? "Wait for the AI to finish" : outdated ? "Publish your latest changes to the live site" : "Rebuild and restart the live site"}
             >
               {!redeploying && <RefreshCw />} <span className="hidden sm:inline">{redeploying ? "Redeploying" : outdated ? "Redeploy changes" : "Redeploy"}</span>
             </Button>
           )}
-          <Button size="sm" variant="secondary" onClick={() => setDeployOpen(true)} disabled={project.status === "CREATING" || redeploying}>
-            <Rocket /> <span className="hidden sm:inline">{deployed ? "Deployed" : "Deploy"}</span>
-          </Button>
-          {deployed && !hasToken && (
+          {!desktop && (
+            <Button size="sm" variant="secondary" onClick={() => setDeployOpen(true)} disabled={project.status === "CREATING" || redeploying}>
+              <Rocket /> <span className="hidden sm:inline">{deployed ? "Deployed" : "Deploy"}</span>
+            </Button>
+          )}
+          {!desktop && deployed && !hasToken && (
             <Button size="sm" variant="accent" onClick={() => setLaunchOpen(true)}>
               <Coins /> <span className="hidden sm:inline">Launch Token</span>
             </Button>
@@ -346,6 +400,20 @@ function BuilderInner({ project: initial, initialMessages, deployed: initiallyDe
           </div>
 
           <div className="shrink-0 border-t border-border p-3">
+            {!ai.ready && (
+              <div className="mb-2 flex items-center justify-between gap-3 border border-warning/30 bg-warning/5 px-3 py-2 text-xs">
+                <span>{ai.label}</span>
+                <Link href="/dashboard/settings" className="shrink-0 font-semibold underline underline-offset-2">
+                  Open Settings
+                </Link>
+              </div>
+            )}
+            {ai.ready && initial.status === "CREATING" && messages.length === 0 && !running && (
+              <div className="mb-2 flex items-center justify-between gap-3 border border-border bg-elevated px-3 py-2 text-xs">
+                Ready to build your first version.
+                <Button size="sm" onClick={() => run({ initial: true }, initial.description)}>Start</Button>
+              </div>
+            )}
             {project.status === "ERROR" && !project.previewUrl && !running && (
               <div className="mb-2 flex items-center justify-between gap-3 border border-danger/25 bg-danger/5 px-3 py-2 text-xs text-danger">
                 The first build didn&apos;t complete.
@@ -370,15 +438,15 @@ function BuilderInner({ project: initial, initialMessages, deployed: initiallyDe
                 }}
                 rows={3}
                 maxLength={8000}
-                placeholder={running ? "Claude is working…" : "Ask Claude to change anything…"}
+                placeholder={!ai.ready ? "Set up your AI provider in Settings first" : running ? "The AI is working…" : "Ask the AI to change anything…"}
                 className="max-h-48 min-h-[84px] border-0 bg-transparent px-3 py-2.5 text-[14px] focus-visible:ring-0"
-                disabled={running}
-                aria-label="Message Claude"
+                disabled={running || !ai.ready}
+                aria-label="Message the AI"
               />
               <div className="flex items-center justify-between gap-2 px-2 pb-2">
                 <span className="flex min-w-0 items-center gap-2">
                   <SkillPicker value={skills} onChange={setSkills} disabled={running} />
-                  <span className="truncate text-[11px] text-subtle max-sm:hidden">Enter to send · Shift+Enter for a new line</span>
+                  <span className="truncate text-[11px] text-subtle max-sm:hidden" title="AI provider">{ai.ready ? ai.label : "Enter to send · Shift+Enter for a new line"}</span>
                 </span>
                 <Button type="submit" size="icon-sm" disabled={!input.trim() || running} loading={running} variant="accent" aria-label="Send">
                   {!running && <ArrowUp />}
@@ -421,7 +489,7 @@ function BuilderInner({ project: initial, initialMessages, deployed: initiallyDe
         </aside>
       </div>
 
-      <DeployDialog
+      {!desktop && <DeployDialog
         open={deployOpen}
         onOpenChange={setDeployOpen}
         projectId={project.id}
@@ -432,7 +500,7 @@ function BuilderInner({ project: initial, initialMessages, deployed: initiallyDe
         busy={running}
         locked={hasToken ? "The URL is recorded in your token's metadata and can't be changed." : null}
         onDeployed={applyDeployed}
-      />
+      />}
       {deployed && (
         <LaunchDialog
           open={launchOpen}

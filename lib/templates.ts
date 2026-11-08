@@ -4,7 +4,7 @@ export const TEMPLATES = [
     title: "Crypto landing page",
     blurb: "Hero, features, tokenomics and roadmap for a token project.",
     prompt:
-      "Create a modern crypto landing page called Aestrodom. Use a black background, purple accents, an animated hero section, a navbar, feature cards, a tokenomics section and a fully responsive design.",
+      "Create a modern crypto landing page called Stardoom AI. Use a black background, purple accents, an animated hero section, a navbar, feature cards, a tokenomics section and a fully responsive design.",
   },
   {
     id: "saas-dashboard",

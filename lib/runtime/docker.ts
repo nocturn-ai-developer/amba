@@ -4,6 +4,10 @@ import { PassThrough } from "stream";
 import tar from "tar-stream";
 import { env } from "@/lib/env";
 import { readAllFiles } from "@/lib/projects/filesystem";
+import { removeLocal, serverInfo, stopServer } from "./local";
+
+/** The desktop app has no Docker: the container helpers below map to the local runtime (lib/runtime/local.ts). */
+const desktop = () => env.appMode === "desktop";
 
 /**
  * Low-level Docker sandbox for generated projects.
@@ -99,6 +103,7 @@ export async function getContainer(projectId: string, kind: ContainerKind): Prom
 }
 
 export async function containerInfo(projectId: string, kind: ContainerKind): Promise<ContainerInfo | null> {
+  if (desktop()) return serverInfo(projectId, kind);
   const c = await getContainer(projectId, kind);
   return c ? inspectInfo(c) : null;
 }
@@ -232,6 +237,7 @@ export async function syncFiles(container: Docker.Container, projectId: string) 
 }
 
 export async function stopContainer(projectId: string, kind: ContainerKind) {
+  if (desktop()) return stopServer(projectId, kind);
   const c = await getContainer(projectId, kind);
   if (!c) return;
   const info = await c.inspect();
@@ -239,11 +245,13 @@ export async function stopContainer(projectId: string, kind: ContainerKind) {
 }
 
 export async function removeContainer(projectId: string, kind: ContainerKind) {
+  if (desktop()) return removeLocal(projectId, kind);
   const c = await getContainer(projectId, kind);
   if (c) await c.remove({ force: true }).catch(() => undefined);
 }
 
 export async function restartContainer(projectId: string, kind: ContainerKind) {
+  if (desktop()) return !!serverInfo(projectId, kind);
   const c = await getContainer(projectId, kind);
   if (!c) return false;
   await c.restart({ t: 5 });
@@ -251,6 +259,7 @@ export async function restartContainer(projectId: string, kind: ContainerKind) {
 }
 
 export async function containerLogs(projectId: string, kind: ContainerKind, tail = 200): Promise<string> {
+  if (desktop()) return "";
   const c = await getContainer(projectId, kind);
   if (!c) return "";
   const buf = (await c.logs({ stdout: true, stderr: true, tail, timestamps: false })) as unknown as Buffer;

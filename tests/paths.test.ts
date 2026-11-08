@@ -42,7 +42,7 @@ describe("project path validation", () => {
   });
 
   it("protects platform-managed toolchain files from writes", () => {
-    expect(() => assertWritablePath("package.json")).toThrow(/managed by Aestrodom/);
+    expect(() => assertWritablePath("package.json")).toThrow(/managed by Stardoom/);
     expect(() => assertWritablePath("vite.config.ts")).toThrow(PathError);
     expect(() => assertWritablePath("tsconfig.json")).toThrow(PathError);
     expect(normalizeProjectPath("package.json")).toBe("package.json"); // still readable
